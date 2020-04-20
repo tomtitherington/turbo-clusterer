@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from glob import glob
 
 
@@ -24,11 +25,29 @@ def taxi_plot():
 
     plt.show()
 
+# def taxi_plot(path):
+# 	# path = 'release/taxi_log_2008_by_id/[{0!s}-{1!s}].txt'.format(lower, upper)
+# 	filenames = glob(path)
+#     dataframes = [pd.read_csv(f, header=None, names=["taxi_id", "date/time", "longitude", "latitude"]) for f in filenames]
+#     result = pd.concat(dataframes)
+#     result_filtered = result[result['longitude'] >= 116]
+#     result_filtered.plot.scatter(x='longitude', y='latitude')
+#     plt.show()
 
-filenames = glob('release/taxi_log_2008_by_id/[0-10357].txt')
-dataframes = [pd.read_csv(f, header=None, names=[
-                          "taxi_id", "date/time", "longitude", "latitude"]) for f in filenames]
-result = pd.concat(dataframes)
-result_filtered = result[result['longitude'] >= 116]
-result_filtered.plot.scatter(x='longitude',y='latitude')
-plt.show()
+
+def taxi_plot(lower, upper):
+    filenames = glob(
+        'release/taxi_log_2008_by_id/[{0!s}-{1!s}].txt'.format(lower, upper))
+    dataframes = [pd.read_csv(f, header=None, names=[
+                              "taxi_id", "date/time", "longitude", "latitude"]) for f in filenames]
+    result = pd.concat(dataframes)
+    result_filtered = result[result['longitude'] >= 116]
+    result_filtered.plot.scatter(x='longitude', y='latitude')
+    plt.show()
+
+
+taxi_plot(0,10357)
+# path = 'release/taxi_log_2008_by_id/[{0!s}-{1!s}].txt'.format(0, 10357)
+# filenames = glob(path)
+# print(path)
+# # taxi_plot(path)
