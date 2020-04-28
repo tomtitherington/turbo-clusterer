@@ -3,8 +3,37 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
 from glob import glob
+import struct
+
+
+def show_taxi_log():
+    filenames = glob(
+        'release/taxi_log_2008_by_id/*.txt')
+    dataframes = [pd.read_csv(f, header=None, names=[
+                              "taxi_id", "date_time", "longitude", "latitude"]) for f in filenames]
+    result = pd.concat(dataframes)
+    print(result.head())
+
+# Combine all taxi points and convert text files into a single hdf5 file
+def csv_to_hdf():
+    filenames = glob(
+        'release/taxi_log_2008_by_id/*.txt')
+    dataframes = [pd.read_csv(f, header=None, names=[
+                              "taxi_id", "date_time", "longitude", "latitude"]) for f in filenames]
+    result = pd.concat(dataframes)
+    # Writes to hdf5 format with taxi_log as the identifier for the group in the store
+    # append=True
+    # mode = 'w'
+    result.to_hdf('taxi_log.h5', 'taxi_log', mode='w')
+
+
+def read_taxi_hdf():
+    # hdf = pd.HDFStore('taxi_log.h5', mode='r')
+    # print(hdf['taxi_log'].head())
+    # df = hdf.select('taxi_log')
+    total_trajs = pd.read_hdf('taxi_log.h5', 'taxi_log')
+    print(total_trajs.head())
 
 
 def taxi_plot():
@@ -35,9 +64,7 @@ def taxi_plot():
 '''
 
 
-def taxi_plot(lower, upper, type):
-    # filenames = glob(
-    #     'release/taxi_log_2008_by_id/[{0!s}-{1!s}].txt'.format(lower, upper))
+def taxi_plot(type):
     filenames = glob(
         'release/taxi_log_2008_by_id/*.txt')
     dataframes = [pd.read_csv(f, header=None, names=[
@@ -60,37 +87,17 @@ def taxi_plot(lower, upper, type):
 def distri_time_plot(lower, upper, start_date, end_date, num_dates):
     # filenames = glob(
     #     'release/taxi_log_2008_by_id/*.txt')
-    filenames = os.listdir("/home/tithers/Documents/Computing Science/Thesis/turbo-clusterer/taxi_log_2008_by_id")
+    filenames = os.listdir(
+        "/home/tithers/Documents/Computing Science/Thesis/turbo-clusterer/taxi_log_2008_by_id")
     dataframes = [pd.read_csv(f, header=None, names=[
                               "taxi_id", "date_time", "longitude", "latitude"]) for f in filenames]
     result = pd.concat(dataframes)
     print(result)
     # Set up figure
-    f = plt.subplots(1,num_dates, sharex=True, sharey=True)
-    slice = result[(result['date_time'] >= '2008-02-0{0!s} 00:00:00'.format(start_date))]
+    f = plt.subplots(1, num_dates, sharex=True, sharey=True)
+    slice = result[(result['date_time'] >=
+                    '2008-02-0{0!s} 00:00:00'.format(start_date))]
     print(slice)
-
-
-
-
-
-
-
-    # result_filtered = result[(result['date_time'] >= '2008-02-0{0!s} 00:00:00'.format(start_date)) & (
-    #     result['date_time'] <= '2008-02-0{0!s} 23:59:59'.format(start_date))]
-    # print(result_filtered[['longitude']])
-    # sns.kdeplot(result_filtered[['longitude']], result_filtered[['latitude']], shade=True)
-    # start_date+=1
-    # print("here")
-    # result_filtered = result[(result['date_time'] >= '2008-02-0{0!s} 00:00:00'.format(start_date)) & (
-    #     result['date_time'] <= '2008-02-0{0!s} 23:59:59'.format(start_date))]
-    # sns.kdeplot(result_filtered[['longitude']], result_filtered[['latitude']], shade=True)
-    # start_date+=1
-    # result_filtered = result[(result['date_time'] >= '2008-02-0{0!s} 00:00:00'.format(start_date)) & (
-    #     result['date_time'] <= '2008-02-0{0!s} 23:59:59'.format(start_date))]
-    # sns.kdeplot(result_filtered[['longitude']], result_filtered[['latitude']], shade=True)
-    # f.tight_layout()
-    #long_lat = result_filtered[['longitude', 'latitude']]
 
     # # Set up figure
     # f, axes = plt.subplots(1,num_dates, sharex=True, sharey=True)
@@ -111,9 +118,15 @@ def distri_time_plot(lower, upper, start_date, end_date, num_dates):
     # f.tight_layout()
 
 
+#csv_to_hdf()
+print(struct.calcsize("P") * 8)
+
+#read_taxi_hdf()
+# show_taxi_log()
+
 #distri_plot(0, 10357)
-taxi_plot(0, 10357, "kde")
+# taxi_plot("kde")
 
 #distri_time_plot(0, 10357, 4, 6, 3)
 
-plt.show()
+# plt.show()
