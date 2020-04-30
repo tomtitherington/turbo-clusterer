@@ -46,14 +46,13 @@ def distance(p_i, p_j):
 ''' df - the dataframe of a taxies complete trajectory '''
 
 
-def stop_point_detection(df, df_size, dist_thresh, time_thresh):
+def detect(df, df_size, dist_thresh, time_thresh):
     i = 0
     stop_points = {'taxi_id': [], 'arrival_dt': [], 'departure_dt': [],
                    'longitude': [], 'latitude': []}
     while i < df_size:
         j = i + 1
         while j < df_size:
-            print(df.iat[j, 2], df.iat[j, 3])
             dist = distance((df.iat[i, 2], df.iat[i, 3]),
                             (df.iat[j, 2], df.iat[j, 3]))
             if dist > dist_thresh:
@@ -72,10 +71,3 @@ def stop_point_detection(df, df_size, dist_thresh, time_thresh):
         i += 1
 
     return pd.DataFrame(stop_points)
-
-
-df = pd.read_csv('release/taxi_log_2008_by_id/1.txt', header=None, names=[
-                 "taxi_id", "date_time", "longitude", "latitude"])
-df['date_time'] = pd.to_datetime(df['date_time'])
-# distnace threshold 50 meters, time threshold 3 minutes
-print(stop_point_detection(df, len(df.index), 50, 3))
