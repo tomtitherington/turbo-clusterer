@@ -3,11 +3,6 @@ import numpy as np
 import pandas as pd
 import datetime
 
-'''
-dataframe format:
-taxi id, date time, longitude, latitude
-'''
-
 
 def mean_coordinate(longs, lats, size):
     avg_longs = 0
@@ -18,19 +13,29 @@ def mean_coordinate(longs, lats, size):
     return (avg_longs / size, avg_lats / size)
 
 
-''' time difference in minutes '''
-
-
 def timespan(p_it, p_jt):
+    """Calculates the time difference between two entries in a log.
+
+    Args:
+        p_it: The datetime at point i.
+        p_jt: The datetime at point j.
+    Returns:
+        The time difference in minutes.
+    """
     return ((p_jt - p_it).seconds) / 60
 
 
-'''φ is latitude, λ is longitude, R is earth’s radius (mean radius = 6,371km)
-uses the ‘haversine’ formula to calculate the great-circle distance between two points
-'''
-
-
 def distance(p_i, p_j):
+    """Calculates the distance in metres between two points.
+
+    Uses the haversine formula to calculate the great-circle distance between two points
+    of the form (longitude,latitude). φ is latitude, λ is longitude, R is earth’s radius
+    (mean radius = 6,371km).
+
+    Args:
+        p_i: A tuple representing the first point.
+        p_j: A tuple representing the second point.
+    """
     R = 6371 * np.exp(3)  # meters
     phi_1 = p_i[1] * np.pi / 180  # radians
     phi_2 = p_j[1] * np.pi / 180
@@ -41,9 +46,6 @@ def distance(p_i, p_j):
         np.cos(phi_2) * np.sin(delta_lambda / 2) * np.sin(delta_lambda / 2)
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c  # in meters
-
-
-''' df - the dataframe of a taxies complete trajectory '''
 
 
 def detect(df, df_size, dist_thresh, time_thresh):
