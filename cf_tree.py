@@ -1,34 +1,46 @@
-
+import numpy as np
 
 class CFTree(object):
-    '''
+    """
     Clustering Feature tree object, consisting of nodes.
 
-    Nodes will automatically be split into two once it is full. When a split
-    occurs, a key will 'float' upwards and be inserted into the parent node to
-    act as a pivot.
+    Nodes will automatically be split into two when they are full. If the root
+    is split, the height increases by one.
+
+    When a split occurs, summaries (Cluster Features) of all sub Cluster Features within each
+    node will be created and subsequently inserted into the parent node. If the
+    parent is full we must split it. Then is applied recursively until we find space
+    for the node. i.e. If the grand-parent node is also full.
+
+    After this, we must update the CFs on the path from the leaf to the root.
 
     Attributes:
+        root (Node): The root of the tree.
         order (int): The maximum number of keys each node can hold.
         threshold (float): The radius of each cluster must be less than this value.
-    '''
+    """
 
-    def __init__(self, order=8, threshold):
+    def __init__(self, order=8, threshold=0.5):
         self.root = Node(order)
+        self.order = order
         self.threshold = threshold
 
-    def _find_node(self, node, entry_cluster):
-        # must check the keys because values are not always the same type
-        # depends on if the node is a leaf or not
-        (index, cluster, distance) = (-1, None, np.inf)
-        for i, item in enumerate(node.keys):
-            centroid_distance = entry_cluster.d0_float(item)
-            if centroid_distance < distance:
-                # can immediately return the cluster?
-                index = i
-                cluster = item
-                distance = centroid_distance
-        return node.values[index], index
+    def _split_summarise(node):
+        left, right = node.seed_split()
+        # creates two cluster features summarising the left and right child
+        left_summary = ClusterFeature(left.cluster_features)
+        right_summary = ClusterFeature(right.cluster_features)
+        return ((left_summary,right_summary),(left,right))
+
+    def _merge(self, parent, index, cfs, children):
+        # CFs within a node are not sorted as there is no condition to sort by
+        # that would speed up insertions and retrievals
+
+        parent.cluster_features[index] = cfs[0]
+        parent.children[index] = children[0]
+
+        parent.cluster_features = parent.cluster_features[:index] + cfs[1] + parent.cluster_features[index:]
+        parent.children[index] = parent.children[:index] + children[1] + parent.children[index:]
 
     def insert_point(self, X):
         """
@@ -44,11 +56,6 @@ class CFTree(object):
             parent = child
             child, index = self._find_node(child, entry_cluster)
 
-        # TODO: Refactor add_point to take in a cluster feature, or create two
-        #       methods one that takes in a position, another that takes a
-        #       cluster.
-        #child.add_point(X)
-
         child.add_entry(entry_cluster)
 
         # index contains the position (index) of the child node in the parent
@@ -58,57 +65,30 @@ class CFTree(object):
 
         if child.is_full():
             if parent is None:
-                left, right = child.seed_split()
-                # creates a cluster feature summarising the left and right child
-                left_summary = ClusterFeature(left.cluster_features)
-                right_summary = ClusterFeature(right.cluster_features)
-                self.root = Node(order=self.order,[left_summary,right_summary],[left,right])
+                self.root = Node(order=self.order,_split_summarise(child))
                 return
             # traverse up the tree
             for parent in parents:
                 # assert(child.is_full())
                 if parent.is_full() is False:
-                    left, right = child.seed_split()
-                    # creates a cluster feature summarising the left and right child
-                    left_summary = ClusterFeature(left.cluster_features)
-                    right_summary = ClusterFeature(right.cluster_features)
                     # we can safely insert the summaries into the parent
-                    self._merge(parent,index,[left_summary,right_summary],[left,right])
+                    self._merge(parent,index,_split_summarise(child))
                     break
                 else:
-                    left, right = child.seed_split()
-                    # creates a cluster feature summarising the left and right child
-                    left_summary = ClusterFeature(left.cluster_features)
-                    right_summary = ClusterFeature(right.cluster_features)
-                    # we have hit the root
                     if parent is None:
+                        # we have hit the root
                         # assert(child==self.root)
-                        self.root = Node(order=self.order,[left_summary,right_summary],[left,right])
+                        self.root = Node(order=self.order,_split_summarise(child))
                         break
                     else:
-                        # we can safely insert the summaries into the parent
-                        self._merge(parent,index,[left_summary,right_summary],[left,right])
+                        # we can insert the summaries into the parent
+                        self._merge(parent,index,_split_summarise(child))
                         child = parent
 
         # refinement step done here
 
-    def retrieve(self, key):
-        '''
-        Returns a value for a given key, and None if the key does not exist.
-        '''
-        child = self.root
-
-        while not child.leaf:
-            child, index = self._find(child, key)
-
-        for i, item in enumerate(child.keys):
-            if key == item:
-                return child.values[i]
-
-        return None
-
     def show(self):
-        '''
+        """
         Prints the keys at each level.
-        '''
+        """
         self.root.show()
