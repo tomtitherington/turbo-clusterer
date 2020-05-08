@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class CFTree(object):
     """
     Clustering Feature tree object, consisting of nodes.
@@ -30,7 +31,7 @@ class CFTree(object):
         # creates two cluster features summarising the left and right child
         left_summary = ClusterFeature(left.cluster_features)
         right_summary = ClusterFeature(right.cluster_features)
-        return ((left_summary,right_summary),(left,right))
+        return ((left_summary, right_summary), (left, right))
 
     def _merge(self, parent, index, cfs, children):
         # CFs within a node are not sorted as there is no condition to sort by
@@ -39,8 +40,10 @@ class CFTree(object):
         parent.cluster_features[index] = cfs[0]
         parent.children[index] = children[0]
 
-        parent.cluster_features = parent.cluster_features[:index] + cfs[1] + parent.cluster_features[index:]
-        parent.children[index] = parent.children[:index] + children[1] + parent.children[index:]
+        parent.cluster_features = parent.cluster_features[:index] + \
+            cfs[1] + parent.cluster_features[index:]
+        parent.children[index] = parent.children[:index] + \
+            children[1] + parent.children[index:]
 
     def insert_point(self, X):
         """
@@ -65,25 +68,45 @@ class CFTree(object):
 
         if child.is_full():
             if parent is None:
-                self.root = Node(order=self.order,_split_summarise(child))
+                self.root = Node(order=self.order, _split_summarise(child))
                 return
             # traverse up the tree
             for parent in parents:
                 # assert(child.is_full())
                 if parent.is_full() is False:
                     # we can safely insert the summaries into the parent
-                    self._merge(parent,index,_split_summarise(child))
-                    break
+                    self._merge(parent, index, _split_summarise(child))
+                    return
                 else:
                     if parent is None:
                         # we have hit the root
                         # assert(child==self.root)
-                        self.root = Node(order=self.order,_split_summarise(child))
-                        break
+                        self.root = Node(order=self.order, _split_summarise(child))
+                        return
                     else:
                         # we can insert the summaries into the parent
-                        self._merge(parent,index,_split_summarise(child))
+                        self._merge(parent, index, _split_summarise(child))
                         child = parent
+
+
+        for parent in parents:
+            if child.is_full():
+                # we must split
+                if parent is None:
+                    # create new root
+                    self.root = Node(order=self.order,_split_summarise(child))
+                    return
+                else:
+                    # we can insert the summaries into the parent
+                    self._merge(parent, index, _split_summarise(child))
+                    child = parent
+            else:
+                # no spliting, but updating the path from leaf to root
+                if parent is None:
+                    return
+                else:
+                    self._merge(parent,index,_summarise(child))
+                    child = parent
 
         # refinement step done here
 
