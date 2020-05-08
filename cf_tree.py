@@ -26,12 +26,34 @@ class CFTree(object):
         self.order = order
         self.threshold = threshold
 
-    def _split_summarise(node):
+    def _summarise(self, node):
+        """
+        Creates a summary Cluster Feature of the Cluster Features within a given node.
+        """
+        # (n, ls, ss) = sum( (cf.n, cf.ls, cf.ss) for cf in node.cluster_features)
+        n, ls, ss = (0, 0, 0)
+        for cf in node.cluster_features:
+            n += cf.n
+            ls += cf.ls
+            ss += cf.ss
+        return ClusterFeature(n, ls, ss)
+
+    def _split_summarise(self, node):
         left, right = node.seed_split()
         # creates two cluster features summarising the left and right child
         left_summary = ClusterFeature(left.cluster_features)
         right_summary = ClusterFeature(right.cluster_features)
         return ((left_summary, right_summary), (left, right))
+
+    def _find_node(self, node, entry_cluster):
+        (index, cluster, distance) = (-1, None, np.inf)
+        for i, item in enumerate(node.cluster_features):
+            centroid_distance = item.distance_metric(entry_cluster)
+            if centroid_distance < distance:
+                index = i
+                cluster = item
+                distance = centroid_distance
+        return node.children[index], index
 
     def _merge(self, parent, index, cfs, children):
         # CFs within a node are not sorted as there is no condition to sort by
@@ -50,14 +72,15 @@ class CFTree(object):
         Inserts a point after traversing to a leaf node. If the leaf
         node is full, split the leaf node into two.
         """
-        parent = None
-        child = self.root
 
+        parents = [(None,None)]
+        child = self.root
         entry_cluster = ClusterFeature(n=1, ls=sum(X), ss=sum(X**2))
 
         while child.children != []:
             parent = child
-            child, index = self._find_node(child, entry_cluster)
+            child, index = self._find_node(child,entry_cluster)
+            parents.append((parent,index))
 
         child.add_entry(entry_cluster)
 
@@ -66,35 +89,14 @@ class CFTree(object):
         # and another cf must be inserted into the parent to represent the another
         # split node
 
-        if child.is_full():
-            if parent is None:
-                self.root = Node(order=self.order, _split_summarise(child))
-                return
-            # traverse up the tree
-            for parent in parents:
-                # assert(child.is_full())
-                if parent.is_full() is False:
-                    # we can safely insert the summaries into the parent
-                    self._merge(parent, index, _split_summarise(child))
-                    return
-                else:
-                    if parent is None:
-                        # we have hit the root
-                        # assert(child==self.root)
-                        self.root = Node(order=self.order, _split_summarise(child))
-                        return
-                    else:
-                        # we can insert the summaries into the parent
-                        self._merge(parent, index, _split_summarise(child))
-                        child = parent
+        # reverse parents list
 
-
-        for parent in parents:
+        for parent in parents.reverse():
             if child.is_full():
                 # we must split
                 if parent is None:
                     # create new root
-                    self.root = Node(order=self.order,_split_summarise(child))
+                    self.root = Node(order=self.order, _split_summarise(child))
                     return
                 else:
                     # we can insert the summaries into the parent
@@ -105,7 +107,8 @@ class CFTree(object):
                 if parent is None:
                     return
                 else:
-                    self._merge(parent,index,_summarise(child))
+                    #self._merge(parent, index, _summarise(child))
+                    parent.cluster_features[index] = _summarise(child)
                     child = parent
 
         # refinement step done here
