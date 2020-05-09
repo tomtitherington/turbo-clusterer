@@ -1,5 +1,37 @@
 import numpy as np
 
+# NOTE: Branching factor cannot be 1 and possibly not 2 either, for performance reasons?
+# TODO: Define + operation for the Cluster Feature: https://realpython.com/operator-function-overloading/
+
+class Node(object):
+    """docstring for Node."""
+
+    def __init__(self, order=8, feature_children=None):
+        self.order = order
+        if feature_children is None:
+            self.cluster_features = []
+            self.children = []
+        else:
+            self.cluster_features = feature_children[0]
+            self.children = feature_children[1]
+
+    # could be merged with find node function inside CFTree
+    def _find_cluster(self, entry):
+        (index, distance) = (-1, np.inf)
+        for i, item in enumerate(self.cluster_features):
+            centroid_distance = item.distance_metric(entry)
+            if centroid_distance < distance:
+                index = i
+                distance = centroid_distance
+        return self.cluster_features[index], index
+
+    def add_entry(self, entry, threshold):
+        current_cf, index = self._find_cluster(entry)
+        new_cf = ClusterFeature(current_cf+entry)
+        if new_cf.diameter() < threshold:
+            self.cluster_features[index] = new_cf
+        else:
+            self.cluster_features.append(entry)
 
 class CFTree(object):
     """
@@ -26,6 +58,7 @@ class CFTree(object):
         self.order = order
         self.threshold = threshold
 
+    # this function and its split derivative might be best suited in the Node class
     def _summarise(self, node):
         """
         Creates a summary Cluster Feature of the Cluster Features within a given node.
@@ -41,8 +74,10 @@ class CFTree(object):
     def _split_summarise(self, node):
         left, right = node.seed_split()
         # creates two cluster features summarising the left and right child
-        left_summary = ClusterFeature(left.cluster_features)
-        right_summary = ClusterFeature(right.cluster_features)
+        left_summary = self._summarise(left)
+        right_summary = self._summarise(right)
+        #left_summary = ClusterFeature(left.cluster_features)
+        #right_summary = ClusterFeature(right.cluster_features)
         return ((left_summary, right_summary), (left, right))
 
     def _find_node(self, node, entry_cluster):
@@ -73,14 +108,14 @@ class CFTree(object):
         node is full, split the leaf node into two.
         """
 
-        parents = [(None,None)]
+        parents = [(None, None)]
         child = self.root
         entry_cluster = ClusterFeature(n=1, ls=sum(X), ss=sum(X**2))
 
         while child.children != []:
             parent = child
-            child, index = self._find_node(child,entry_cluster)
-            parents.append((parent,index))
+            child, index = self._find_node(child, entry_cluster)
+            parents.append((parent, index))
 
         child.add_entry(entry_cluster)
 
@@ -91,16 +126,17 @@ class CFTree(object):
 
         # reverse parents list
 
-        for parent in parents.reverse():
+        # not sure this is sound syntax
+        for parent, index in parents.reverse():
             if child.is_full():
                 # we must split
                 if parent is None:
                     # create new root
-                    self.root = Node(order=self.order, _split_summarise(child))
+                    self.root = Node(order=self.order, self._split_summarise(child))
                     return
                 else:
-                    # we can insert the summaries into the parent
-                    self._merge(parent, index, _split_summarise(child))
+                    # we can insert the summaries into the parent (in the next iteration we check if that insertion made the parent full)
+                    self._merge(parent, index, self._split_summarise(child))
                     child = parent
             else:
                 # no spliting, but updating the path from leaf to root
@@ -108,13 +144,8 @@ class CFTree(object):
                     return
                 else:
                     #self._merge(parent, index, _summarise(child))
-                    parent.cluster_features[index] = _summarise(child)
+                    # must update all ancestors of the child
+                    parent.cluster_features[index] = self._summarise(child)
                     child = parent
 
         # refinement step done here
-
-    def show(self):
-        """
-        Prints the keys at each level.
-        """
-        self.root.show()
