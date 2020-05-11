@@ -7,6 +7,9 @@ import functools as ft
 # TODO: Create a distance metric class containing methods that correspond to the
 #       different distance metrics in the BIRCH paper, the CF tree will store a chosen method/metric
 #       as an attribute
+# TODO:
+#       1) Adapt CFtree and Node class to use np.array for ls.
+#       2) Carry on with testing the module.
 
 
 class ClusterFeature(object):
@@ -52,11 +55,7 @@ class ClusterFeature(object):
         """
         The radius is the average distance from member points to the centroid.
         """
-        wiki = self.ss / self.n - self.centroid()**2
         c = self.centroid()
-        mine = (self.n*c**2 + self.ss - 2*c*self.ls)/self.n
-        #return self.centroid().dot(self.centroid())
-        #return self.ss / self.n, self.centroid()**2
         return np.sqrt(self.ss / self.n - c.dot(c))
 
     def distance_metric(self, other):
