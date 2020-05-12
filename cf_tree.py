@@ -23,7 +23,7 @@ class ClusterFeature(object):
         sum of the n data points, a vector of size d. Where d is the number
         of features to cluster the data-set on.
         ss (float): The square sum of the n data points.
-        timestamps ([datetime]): An arrary of size n_taxis, each element
+        timestamps ([[datetime]]): An arrary of size n_taxis, each element
         containing the timestamps at which this cluster was visited. The index represents the taxi id.
     """
 
@@ -41,6 +41,12 @@ class ClusterFeature(object):
         self.ls += other.ls
         self.ss += other.ss
         return self
+
+    def __radd__(self,other):
+        if other == 0:
+            return self
+        else:
+            return self.__add__(other)
 
     def __eq__(self, other):
         if self.n == other.n and (self.ls == other.ls).all() and \
@@ -62,7 +68,8 @@ class ClusterFeature(object):
         """
         A Euclidian distance metric. Referred to as D0 in the BIRCH clustering paper.
         """
-        return np.sqrt((self.centroid() - other.centroid())**2)
+        dif = self.centroid() - other.centroid()
+        return np.sqrt(dif.dot(dif))
 
     def show(self):
         print("N: {}, LS: {}, SS: {}, Radius: {}, Centroid: {}".format(
@@ -109,7 +116,8 @@ class Node(object):
             A cluster followed by its position in the node. OR
             A child entry followed by its position in the node.
         """
-        (index, distance) = (-1, np.inf)
+        index = -1
+        distance = np.inf
         for i, item in enumerate(self.cluster_features):
             centroid_distance = item.distance_metric(entry)
             if centroid_distance < distance:
@@ -121,39 +129,43 @@ class Node(object):
             return self.children[index], index
 
     def add_entry(self, entry, threshold):
+        if self.cluster_features == []:
+            self.cluster_features.append(entry)
+            return
         current_cf, index = self._find(entry, 'c')
         new_cf = current_cf + entry
-        if new_cf.diameter() < threshold:
+        if new_cf.radius() < threshold:
             self.cluster_features[index] = new_cf
         else:
             self.cluster_features.append(entry)
 
-    def seed_split(self):
+    def seed_split(self, threshold):
         """Splits the node into two nodes.
 
         It choses the two clusters that are furthest apart, with regard to the chosen distance
         metric. These are the seeds, the two seeds are placed into seperate new nodes. The remaining
         entries are distributed between these nodes, based on the which cluster they are closest to.
         """
-
-        (seed_l, seed_r, max_dist) = (None, None, np.NINF)
+        seed_l = None
+        seed_r = None
+        max_dist = np.NINF
         for x, y in itr.permutations(self.cluster_features, r=2):
             if x.distance_metric(y) > max_dist:
                 seed_l = x
                 seed_r = y
-        left = Node(self.order, ([seed_l], []))
-        right = Node(self.order, ([seed_r], []))
+        left = Node(self.order, [[seed_l], []])
+        right = Node(self.order, [[seed_r], []])
 
         # when storing the max distance, also store the index
         # pop the entry from the list
         # then the first if statement can be removed
         # pop each element as we go?
-        for i, cf in self.cluster_features:
+        for i, cf in enumerate(self.cluster_features):
             if cf != seed_l and cf != seed_r:
                 if cf.distance_metric(seed_l) < cf.distance_metric(seed_r):
-                    left.add_entry(cf)
+                    left.add_entry(cf, threshold)
                 else:
-                    right.add_entry(cf)
+                    right.add_entry(cf, threshold)
         return left, right
 
     def _summarise(self):
@@ -164,6 +176,18 @@ class Node(object):
 
     def is_full(self):
         return len(self.cluster_features) == self.order
+
+    def show(self):
+        print("Clusters:")
+        for cf in self.cluster_features:
+            cf.show()
+        print(self.children)
+        # if self.children == []:
+        #     return
+        # print("Children:")
+        # print
+        # for child in self.children:
+        #     pass
 
 
 class CFTree(object):
@@ -193,10 +217,10 @@ class CFTree(object):
         self.threshold = threshold
 
     def _split_summarise(self, node):
-        left, right = node.seed_split()
+        left, right = node.seed_split(self.threshold)
         left_summary = left._summarise()
         right_summary = right._summarise()
-        return ((left_summary, right_summary), (left, right))
+        return [[left_summary, right_summary], [left, right]]
 
     def _merge(self, parent, index, cfs, children):
         # CFs within a node are not sorted as there is no condition to sort by
@@ -218,30 +242,28 @@ class CFTree(object):
 
         Args:
             self (CFTree): A Cluster Feature tree instance.
-            X (Vector): A vector/point that is to be added to a cluster in the tree.
+            X (Vector): A vector/point that is to be added to a cluster in the tree. NOTE: This
+            must be a numpy arrary.
         """
 
-        parents = [(None, None)]
+        parents = [[None, None]]
         child = self.root
-        entry_cluster = ClusterFeature(n=1, ls=sum(
-            X), ss=ft.reduce(lambda x, y: x + y * y, X))
+        entry_cluster = ClusterFeature(n=1, ls=X, ss=np.sum(X**2))
 
         while child.children != []:
             parent = child
             child, index = child._find(entry_cluster, 'n')
-            parents.append((parent, index))
+            parents.append([parent, index])
 
-        child.add_entry(entry_cluster)
+        child.add_entry(entry_cluster,self.threshold)
 
         # index contains the position (index) of the child node in the parent
         # this must be modified to now represent one of the split nodes,
         # and another cf must be inserted into the parent to represent the another
         # split node
 
-        # reverse parents list
-
         # not sure this is sound syntax
-        for parent, index in parents.reverse():
+        for parent, index in reversed(parents):
             if child.is_full():
                 # we must split
                 if parent is None:
@@ -260,15 +282,15 @@ class CFTree(object):
                 else:
                     #self._merge(parent, index, _summarise(child))
                     # must update all ancestors of the child
+                    print(parent)
+                    print(child._summarise())
                     parent.cluster_features[index] = child._summarise()
                     child = parent
 
         # refinement step done here
 
 
-def test_module():
-    points = np.array([[2, 3], [2, 2], [1, 3], [10, 11], [11, 11], [10, 12]])
-    print(np.square(points[0]))
+def test_clusterfeature(points):
     cf = ClusterFeature(n=1, ls=points[0], ss=np.sum(points[0]**2))
     cf_2 = ClusterFeature(n=1, ls=points[1], ss=np.sum(points[1]**2))
     cf.show()
@@ -278,6 +300,51 @@ def test_module():
     cf += cf_2
     cf.show()
     assert cf == cf_3
+    cf_4 = ClusterFeature(n=1, ls=points[3], ss=np.sum(points[3]**2))
+    cf_5 = ClusterFeature(n=1, ls=points[2], ss=np.sum(points[2]**2))
+    cf_4.show()
+    cf_5.show()
+    print(cf_4.distance_metric(cf_5))
+    assert cf_4.distance_metric(cf_5) == cf_5.distance_metric(cf_4)
+
+
+def test_node(order,points, threshold):
+    cf = ClusterFeature(n=1, ls=points[0], ss=np.sum(points[0]**2))
+    cf_2 = ClusterFeature(n=1, ls=points[1], ss=np.sum(points[1]**2))
+    n1 = Node(order)
+    n1.add_entry(cf, threshold)
+    n1.add_entry(cf_2, threshold)
+    n1.show()
+    cf_3 = ClusterFeature(n=1, ls=points[3], ss=np.sum(points[3]**2))
+    cf_4 = ClusterFeature(n=1, ls=points[2], ss=np.sum(points[2]**2))
+    n1.add_entry(cf_3, threshold)
+    n1.add_entry(cf_4, threshold)
+    n1.show()
+    left, right = n1.seed_split(threshold)
+    left.show()
+    right.show()
+    left_summary = left._summarise()
+    print("Left summary:")
+    left_summary.show()
+    right_summary = right._summarise()
+    print("Right summary:")
+    right_summary.show()
+
+def test_tree(order,points,threshold):
+    tree = CFTree(order,threshold)
+    for vector in points:
+        tree.insert_point(vector)
+
+
+
+
+def test_module():
+    points = np.array([[2, 3], [2, 2], [1, 3], [10, 11], [11, 11], [10, 12]])
+    threshold = 0.001
+    order = 4
+    test_clusterfeature(points.copy())
+    test_node(order,points.copy(), threshold)
+    test_tree(order,points,threshold)
 
 
 if __name__ == '__main__':
