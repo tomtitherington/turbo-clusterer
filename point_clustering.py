@@ -7,9 +7,18 @@ import datetime
 from sklearn.cluster import Birch, KMeans
 
 import stop_point_detection as spd
+import cf_tree as cft
 
 
-
+def build_tree(df, order, threshold):
+    tree = cft.CFTree(order,threshold)
+    lnglats = df[['longitude', 'latitude']]
+    count = 0
+    for index, row in lnglats.iterrows():
+        tree.insert_point(row.values)
+        count+=1
+    print("Count {}".format(count))
+    tree.show()
 
 
 def birch(df):
@@ -40,6 +49,10 @@ def cluster(df, type, show_plot=None):
         plot(lnglats, labels)
         plt.show()
     return labels
+
+
+# read each taxis points and add them into the cf tree
+# do this incrementally for each taxi
 
 # lnglats = sp[['longitude', 'latitude']]
 # lnglats100 = sp100[['longitude', 'latitude']]

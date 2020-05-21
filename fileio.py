@@ -80,18 +80,19 @@ def cluster_sp(store, type, taxi_id=None, plot=None):
     if taxi_id is None:
         return "Not yet implemented"
     df = store.get('sp/t{}'.format(taxi_id))
-    labels = pc.cluster(df, type, plot)
+    pc.build_tree(df,10,0.001)
     store.close()
-    return labels
+    return
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-c", "--convert", nargs=2, required=True,
-                help="Convert the files specified first arg (directory) into a single HDF5 with \
-                name specified in second arg")
-print(vars(ap.parse_args()))
+
+# ap = argparse.ArgumentParser()
+# ap.add_argument("-c", "--convert", nargs=2, required=True,
+#                help="Convert the files specified first arg (directory) into a single HDF5 with \
+#                name specified in second arg")
+# print(vars(ap.parse_args()))
 
 filename = "taxi_store.h5"
 # initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
 # calculate_sp(connect_to_store(filename),10, 50, 3)
-# cluster_sp(connect_to_store(filename),'birch',10,'y')
+cluster_sp(connect_to_store(filename),'birch',1,'y')

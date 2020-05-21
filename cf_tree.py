@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import itertools as itr
 import functools as ft
 import numpy as np
@@ -96,7 +97,7 @@ class Node(object):
             self.cluster_features = feature_children[0]
             self.children = feature_children[1]
 
-    def __iadd__(self,other):
+    def __iadd__(self, other):
         self.cluster_features = self.cluster_features + other.cluster_features
         self.children = self.children + other.children
         return self
@@ -140,6 +141,7 @@ class Node(object):
         if new_cf.radius() < threshold:
             self.cluster_features[index] = new_cf
             if child is not None:
+                print("not good")
                 # NOTE: Don't think this case is ever possible since if they
                 # can be combined, they already will have been combined
                 self.children[index] += child
@@ -177,7 +179,7 @@ class Node(object):
             right = Node(self.order, [[seed_r], [self.children[r_index]]])
         else:
             left = Node(self.order, [[seed_l], []])
-            right= Node(self.order, [[seed_r], []])
+            right = Node(self.order, [[seed_r], []])
 
         # self.cluster_features.pop(l_index)
         # self.cluster_features.pop(r_index)
@@ -216,6 +218,26 @@ class Node(object):
         print("Children at depth: {}".format(depth))
         for child in self.children:
             child.show(depth + 1)
+
+    def show_contents(self):
+        for cf in self.cluster_features:
+            cf.show()
+
+    def get_layer(self, current_layer, target_layer):
+        """
+        Creates a list of nodes that belong to the target layer.
+        """
+        if current_layer > target_layer:
+            return []
+        if current_layer == target_layer:
+            return self
+        if self.children == []:
+            return  []
+        nodes = []
+        for child in self.children:
+            nodes.append(child.get_layer(current_layer+1,target_layer))
+        return nodes
+
 
 
 class CFTree(object):
@@ -257,10 +279,11 @@ class CFTree(object):
         parent.cluster_features[index] = cfs[0]
         parent.children[index] = children[0]
 
-        parent.cluster_features= parent.cluster_features[: index] + \
-            [cfs[1]] + parent.cluster_features[index: ]
-        parent.children= parent.children[: index] + \
-            [children[1]] + parent.children[index: ]
+        parent.cluster_features = parent.cluster_features[: index] + \
+            [cfs[1]] + parent.cluster_features[index:]
+        parent.children = parent.children[: index] + \
+            [children[1]] + parent.children[index:]
+
 
     def insert_point(self, X):
         """Inserts a point after traversing to a leaf node.
@@ -276,8 +299,7 @@ class CFTree(object):
 
         parents = [[None, None]]
         child = self.root
-        entry_cluster = ClusterFeature(n = 1, ls = X, ss = np.sum(X**2))
-
+        entry_cluster = ClusterFeature(n=1, ls=X, ss=np.sum(X**2))
 
         while child.children != []:
             parent = child
@@ -297,7 +319,7 @@ class CFTree(object):
                 # we must split
                 if parent is None:
                     # create new root
-                    self.root= Node(
+                    self.root = Node(
                         order=self.order, feature_children=self._split_summarise(child))
                     return
                 else:
@@ -319,10 +341,14 @@ class CFTree(object):
     def show(self):
         self.root.show(0)
 
+    def show_layer(self, target_layer):
+        layer = self.root.get_layer(0,target_layer)
+        print(layer)
+
 
 def test_clusterfeature(points):
-    cf = ClusterFeature(n = 1, ls = points[0], ss = np.sum(points[0]**2))
-    cf_2 = ClusterFeature(n = 1, ls = points[1], ss = np.sum(points[1]**2))
+    cf = ClusterFeature(n=1, ls=points[0], ss=np.sum(points[0]**2))
+    cf_2 = ClusterFeature(n=1, ls=points[1], ss=np.sum(points[1]**2))
     cf.show()
     cf_2.show()
     cf_3 = cf + cf_2
@@ -330,8 +356,8 @@ def test_clusterfeature(points):
     cf += cf_2
     cf.show()
     assert cf == cf_3
-    cf_4 = ClusterFeature(n = 1, ls = points[3], ss = np.sum(points[3]**2))
-    cf_5 = ClusterFeature(n = 1, ls = points[2], ss = np.sum(points[2]**2))
+    cf_4 = ClusterFeature(n=1, ls=points[3], ss=np.sum(points[3]**2))
+    cf_5 = ClusterFeature(n=1, ls=points[2], ss=np.sum(points[2]**2))
     cf_4.show()
     cf_5.show()
     print(cf_4.distance_metric(cf_5))
@@ -339,14 +365,14 @@ def test_clusterfeature(points):
 
 
 def test_node(order, points, threshold):
-    cf = ClusterFeature(n = 1, ls = points[0], ss = np.sum(points[0]**2))
-    cf_2 = ClusterFeature(n = 1, ls = points[1], ss = np.sum(points[1]**2))
+    cf = ClusterFeature(n=1, ls=points[0], ss=np.sum(points[0]**2))
+    cf_2 = ClusterFeature(n=1, ls=points[1], ss=np.sum(points[1]**2))
     n1 = Node(order)
     n1.add_entry(cf, threshold)
     n1.add_entry(cf_2, threshold)
     n1.show()
-    cf_3 = ClusterFeature(n = 1, ls = points[3], ss = np.sum(points[3]**2))
-    cf_4 = ClusterFeature(n = 1, ls = points[2], ss = np.sum(points[2]**2))
+    cf_3 = ClusterFeature(n=1, ls=points[3], ss=np.sum(points[3]**2))
+    cf_4 = ClusterFeature(n=1, ls=points[2], ss=np.sum(points[2]**2))
     n1.add_entry(cf_3, threshold)
     n1.add_entry(cf_4, threshold)
     n1.show()
@@ -376,6 +402,7 @@ def test_tree(order, points, threshold):
     tree.insert_point(np.array([10, 10]))
     print("<---showing tree--->")
     tree.show()
+    tree.show_layer(1)
 
 
 def test_module():
