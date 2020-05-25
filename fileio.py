@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import pandas as pd
 import tables
 import os
@@ -75,12 +75,20 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         store.append("sp/t{}".format(i), sp, format='table', index=False)
     store.close()
 
+def save_clusters(clusters, c):
+    # the first entry specifies the layer of the tree
+    layer = clusters.pop(0)
+    for cluster in clusters:
+        c.execute("INSERT INTO clusters VALUES ({},{})")
 
 def cluster_sp(store, type, taxi_id=None, plot=None):
+    layer = 1
     if taxi_id is None:
         return "Not yet implemented"
     df = store.get('sp/t{}'.format(taxi_id))
-    pc.build_tree(df,10,0.001)
+    nodes = pc.build_tree(df,10,0.001,layer)
+    # Insert a row of data
+    # c.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
     store.close()
     return
 

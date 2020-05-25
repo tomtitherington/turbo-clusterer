@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -10,7 +10,7 @@ import stop_point_detection as spd
 import cf_tree as cft
 
 
-def build_tree(df, order, threshold):
+def build_tree(df, order, threshold, layer):
     tree = cft.CFTree(order,threshold)
     lnglats = df[['longitude', 'latitude']]
     count = 0
@@ -19,6 +19,8 @@ def build_tree(df, order, threshold):
         count+=1
     print("Count {}".format(count))
     tree.show()
+    return tree
+
 
 
 def birch(df):

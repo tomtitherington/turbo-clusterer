@@ -9,7 +9,10 @@ import numpy as np
 #       as an attribute
 # TODO:
 #       1) Adapt CFtree and Node class to use np.array for ls.
-#       2) Carry on with testing the module.
+#       1) Carry on with testing the module.
+#       2) Add cluster id as an attribute to a cluster feature, last node id will need to be a global variable or at least a variable
+#           stored in the tree
+#       3) Complete the save tree function
 
 
 class ClusterFeature(object):
@@ -31,7 +34,6 @@ class ClusterFeature(object):
         self.n = n
         self.ls = ls
         self.ss = ss
-        self.timestamps = []
 
     def __add__(self, other):
         return ClusterFeature(self.n + other.n, self.ls + other.ls, self.ss + other.ss)
@@ -50,7 +52,7 @@ class ClusterFeature(object):
 
     def __eq__(self, other):
         if self.n == other.n and (self.ls == other.ls).all() and \
-                self.ss == other.ss and self.timestamps == other.timestamps:
+                self.ss == other.ss:
             return True
         return False
 
@@ -71,9 +73,12 @@ class ClusterFeature(object):
         dif = self.centroid() - other.centroid()
         return np.sqrt(dif.dot(dif))
 
+    def contents(self):
+        return self.n, self.ls, self.ss, self.radius(), self.centroid()
+
     def show(self):
         print("N: {}, LS: {}, SS: {}, Radius: {}, Centroid: {}".format(
-            self.n, self.ls, self.ss, self.radius(), self.centroid()))
+            self.n, self.ls, self.ss, self.radius(), self.centroid() )  )
 
 
 class Node(object):
@@ -219,9 +224,8 @@ class Node(object):
         for child in self.children:
             child.show(depth + 1)
 
-    def show_contents(self):
-        for cf in self.cluster_features:
-            cf.show()
+    def _contents(self, layer):
+        return [layer] + self.cluster_features
 
     def get_layer(self, current_layer, target_layer):
         """
@@ -230,14 +234,24 @@ class Node(object):
         if current_layer > target_layer:
             return []
         if current_layer == target_layer:
-            return self
+            # return self
+            return self._contents(current_layer)
         if self.children == []:
-            return  []
+            return []
         nodes = []
         for child in self.children:
-            nodes.append(child.get_layer(current_layer+1,target_layer))
+            nodes.append(child.get_layer(current_layer + 1, target_layer))
         return nodes
 
+    def save_node(self, layer, store, cluster_id):
+        # store.append("sp/t{}".format(i), sp, format='table', index=False)
+        clusters = []
+        for cf in self.cluster_features:
+            clusters.append([layer] + [cf.contents()] )
+
+        store.append("clusters/l{}".format(layer), clusters, format='table', index=False)
+        for i ,child in enumerate(self.children):
+            child.save_node(layer+1,store,)
 
 
 class CFTree(object):
@@ -283,7 +297,6 @@ class CFTree(object):
             [cfs[1]] + parent.cluster_features[index:]
         parent.children = parent.children[: index] + \
             [children[1]] + parent.children[index:]
-
 
     def insert_point(self, X):
         """Inserts a point after traversing to a leaf node.
@@ -342,8 +355,12 @@ class CFTree(object):
         self.root.show(0)
 
     def show_layer(self, target_layer):
-        layer = self.root.get_layer(0,target_layer)
+        layer = self.root.get_layer(0, target_layer)
         print(layer)
+        return layer
+
+    def save_tree(self):
+        return self.root.save_node(0)
 
 
 def test_clusterfeature(points):
@@ -403,6 +420,7 @@ def test_tree(order, points, threshold):
     print("<---showing tree--->")
     tree.show()
     tree.show_layer(1)
+    #print(tree.save_tree())
 
 
 def test_module():
