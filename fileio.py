@@ -7,6 +7,8 @@ import argparse
 
 import stop_point_detection as spd
 import point_clustering as pc
+import cf_tree as cft
+
 
 
 def connect_to_store(filename):
@@ -75,24 +77,42 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         store.append("sp/t{}".format(i), sp, format='table', index=False)
     store.close()
 
-def save_clusters(clusters, c):
-    # the first entry specifies the layer of the tree
-    layer = clusters.pop(0)
-    for cluster in clusters:
-        c.execute("INSERT INTO clusters VALUES ({},{})")
 
-def cluster_sp(store, type, taxi_id=None, plot=None):
-    layer = 1
-    if taxi_id is None:
-        return "Not yet implemented"
-    df = store.get('sp/t{}'.format(taxi_id))
-    nodes = pc.build_tree(df,10,0.001,layer)
-    # Insert a row of data
-    # c.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
+# def cluster_sp(store, type, taxi_id=None, plot=None):
+#     layer = 1
+#     if taxi_id is None:
+#         return "Not yet implemented"
+#     df = store.get('sp/t{}'.format(taxi_id))
+#     tree = pc.build_tree(df,10,0.01,layer)
+#     tree.save_tree(store)
+#     store.close()
+#     return
+
+def cluster_sp(store, order, threshold, r):
+    tree = cft.CFTree(order, threshold)
+    # read each taxis stop points in range r
+    for i in r:
+        df = store.get('sp/t{}'.format(i))
+        lnglats = df[['longitude', 'latitude']]
+        for index, row in lnglats.iterrows():
+            tree.insert_point(row.values)
+    tree.save_tree(store)
     store.close()
-    return
 
 
+def read_clusters(store, layer):
+    clusters = store.get('clusters/l{}'.format(0))
+    store.close()
+    print(clusters)
+
+def delete_clusters(store):
+    store.remove('clusters/')
+    store.close()
+    #print(store.groups())
+
+def delete_sps(store):
+    store.remove('sp/')
+    store.close()
 
 # ap = argparse.ArgumentParser()
 # ap.add_argument("-c", "--convert", nargs=2, required=True,
@@ -103,4 +123,11 @@ def cluster_sp(store, type, taxi_id=None, plot=None):
 filename = "taxi_store.h5"
 # initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
 # calculate_sp(connect_to_store(filename),10, 50, 3)
-cluster_sp(connect_to_store(filename),'birch',1,'y')
+
+
+# cluster_sp(connect_to_store(filename),50, 0.5, (1,500))
+# read_clusters(connect_to_store(filename),0)
+# delete_clusters(connect_to_store(filename))
+
+calculate_sp(connect_to_store(filename),1000, 50, 3)
+# delete_sps(connect_to_store(filename))

@@ -2,6 +2,7 @@
 import itertools as itr
 import functools as ft
 import numpy as np
+import pandas as pd
 
 # NOTE: Branching factor cannot be 1 and possibly not 2 either, for performance reasons?
 # TODO: Create a distance metric class containing methods that correspond to the
@@ -13,6 +14,8 @@ import numpy as np
 #       2) Add cluster id as an attribute to a cluster feature, last node id will need to be a global variable or at least a variable
 #           stored in the tree
 #       3) Complete the save tree function
+
+__CID__ = 0
 
 
 class ClusterFeature(object):
@@ -26,8 +29,6 @@ class ClusterFeature(object):
         sum of the n data points, a vector of size d. Where d is the number
         of features to cluster the data-set on.
         ss (float): The square sum of the n data points.
-        timestamps ([[datetime]]): An arrary of size n_taxis, each element
-        containing the timestamps at which this cluster was visited. The index represents the taxi id.
     """
 
     def __init__(self, n, ls, ss):
@@ -76,9 +77,12 @@ class ClusterFeature(object):
     def contents(self):
         return self.n, self.ls, self.ss, self.radius(), self.centroid()
 
+    def array_contents(self):
+        return [self.n, self.ls[0], self.ls[1], self.ss, self.radius(), self.centroid()[0], self.centroid()[1]]
+
     def show(self):
         print("N: {}, LS: {}, SS: {}, Radius: {}, Centroid: {}".format(
-            self.n, self.ls, self.ss, self.radius(), self.centroid() )  )
+            self.n, self.ls, self.ss, self.radius(), self.centroid()))
 
 
 class Node(object):
@@ -243,15 +247,17 @@ class Node(object):
             nodes.append(child.get_layer(current_layer + 1, target_layer))
         return nodes
 
-    def save_node(self, layer, store, cluster_id):
-        # store.append("sp/t{}".format(i), sp, format='table', index=False)
-        clusters = []
+    def save_node(self, layer, store):
+        global __CID__
         for cf in self.cluster_features:
-            clusters.append([layer] + [cf.contents()] )
-
-        store.append("clusters/l{}".format(layer), clusters, format='table', index=False)
-        for i ,child in enumerate(self.children):
-            child.save_node(layer+1,store,)
+            cluster_record = np.array([__CID__, layer] + cf.array_contents())
+            df = pd.DataFrame([cluster_record], columns=[
+                              "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"])
+            store.append("clusters/l{}".format(layer),
+                         df, format='table', index=False)
+            __CID__ += 1
+        for child in self.children:
+            child.save_node(layer + 1, store)
 
 
 class CFTree(object):
@@ -359,8 +365,8 @@ class CFTree(object):
         print(layer)
         return layer
 
-    def save_tree(self):
-        return self.root.save_node(0)
+    def save_tree(self, store):
+        self.root.save_node(0, store)
 
 
 def test_clusterfeature(points):
@@ -420,7 +426,7 @@ def test_tree(order, points, threshold):
     print("<---showing tree--->")
     tree.show()
     tree.show_layer(1)
-    #print(tree.save_tree())
+    # print(tree.save_tree())
 
 
 def test_module():

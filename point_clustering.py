@@ -10,6 +10,7 @@ import stop_point_detection as spd
 import cf_tree as cft
 
 
+
 def build_tree(df, order, threshold, layer):
     tree = cft.CFTree(order,threshold)
     lnglats = df[['longitude', 'latitude']]
