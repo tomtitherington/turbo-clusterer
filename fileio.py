@@ -72,7 +72,11 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         ....
     """
     for i in range(1, n + 1):
-        log = store.get('logs/t{}'.format(i))
+        try:
+            log = store.get('logs/t{}'.format(i))
+        except:
+            print("File logs/t{} could not be opened".format(i))
+            continue
         sp = spd.detect(log, len(log.index), delta_d, delta_t)
         store.append("sp/t{}".format(i), sp, format='table', index=False)
     store.close()
@@ -91,8 +95,12 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
 def cluster_sp(store, order, threshold, r):
     tree = cft.CFTree(order, threshold)
     # read each taxis stop points in range r
-    for i in r:
-        df = store.get('sp/t{}'.format(i))
+    for i in range(r[0],r[1]):
+        try:
+            df = store.get('sp/t{}'.format(i))
+        except:
+            print("File sp/t{} could not be opened".format(i))
+            continue
         lnglats = df[['longitude', 'latitude']]
         for index, row in lnglats.iterrows():
             tree.insert_point(row.values)
@@ -121,13 +129,20 @@ def delete_sps(store):
 # print(vars(ap.parse_args()))
 
 filename = "taxi_store.h5"
-# initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
-# calculate_sp(connect_to_store(filename),10, 50, 3)
 
+""" initial_convert """
+#initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
 
-# cluster_sp(connect_to_store(filename),50, 0.5, (1,500))
+""" stop point calculation """
+# calculate_sp(connect_to_store(filename),1000, 50, 3)
+# delete_sps(connect_to_store(filename))
+
+""" clustering """
+# cluster_sp(connect_to_store(filename),50, 0.5, (1,1000))
 # read_clusters(connect_to_store(filename),0)
 # delete_clusters(connect_to_store(filename))
 
-calculate_sp(connect_to_store(filename),1000, 50, 3)
-# delete_sps(connect_to_store(filename))
+# store = connect_to_store(filename)
+# df = store.get('sp/t{}'.format(300))
+# print(df)
+# store.close()
