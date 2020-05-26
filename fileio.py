@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 import pandas as pd
+import numpy as np
 import tables
 import os
 import os.path
 import argparse
 
 import stop_point_detection as spd
-import point_clustering as pc
 import cf_tree as cft
-
 
 
 def connect_to_store(filename):
@@ -82,20 +81,10 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
     store.close()
 
 
-# def cluster_sp(store, type, taxi_id=None, plot=None):
-#     layer = 1
-#     if taxi_id is None:
-#         return "Not yet implemented"
-#     df = store.get('sp/t{}'.format(taxi_id))
-#     tree = pc.build_tree(df,10,0.01,layer)
-#     tree.save_tree(store)
-#     store.close()
-#     return
-
 def cluster_sp(store, order, threshold, r):
     tree = cft.CFTree(order, threshold)
     # read each taxis stop points in range r
-    for i in range(r[0],r[1]):
+    for i in range(r[0], r[1]):
         try:
             df = store.get('sp/t{}'.format(i))
         except:
@@ -107,16 +96,67 @@ def cluster_sp(store, order, threshold, r):
     tree.save_tree(store)
     store.close()
 
+# "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"
+
+
+def distance(c1, c2):
+    x = c1[0] - c2[0]
+    y = c1[1] - c2[1]
+    x *= x
+    y *= y
+    return np.sqrt(x + y)
+
+# TODO: must change to use the syntax of a data frame, see point clustering file
+
+
+def find_cluster(clusters, long, lat):
+    c_index = 0
+    # c_distance = distance(
+    #     (long, lat), (clusters[0]['centroid_0'], clusters[0]['centroid_1']))
+    #clusters.iat[i, 2]
+    c_distance = distance(
+        (long, lat), (clusters.iat[0, 7], clusters.iat[0, 8]))
+    for index, row in clusters.iloc[1:].iterrows():
+        dist = distance((row['centroid_0'], row['centroid_1']), (long, lat))
+        if dist < c_distance:
+            c_index = index
+            c_distance = dist
+    return clusters.iat[c_index,1]
+
+
+def create_cluster_sequence(store, taxi, layer):
+    try:
+        clusters = store.get('clusters/l{}'.format(layer))
+        taxi_sp = store.get('sp/t{}'.format(taxi))
+    except:
+        print("Clusters at layer {} could not be opened".format(layer))
+        return
+    # NOTE: worth rebuilding the tree and then querying instead?
+    cluster_seq = np.array([])
+    for index, row in taxi_sp.iterrows():
+        cluster = find_cluster(clusters, row['longitude'], row['latitude'])
+        cluster_seq = np.append(cluster_seq, cluster)
+    print("Stop point count {}, Cluster sequence count {}".format(len(taxi_sp.index),cluster_seq.size ))
+    taxi_sp['clusters'] = cluster_seq
+    store.append("sp/t{}".format(taxi), taxi_sp,  format='table',
+                 append=False, index=False)
+
+
+def get_sp(store, taxi):
+    return store.get('sp/t{}'.format(taxi))
+
 
 def read_clusters(store, layer):
     clusters = store.get('clusters/l{}'.format(0))
     store.close()
     print(clusters)
 
+
 def delete_clusters(store):
     store.remove('clusters/')
     store.close()
-    #print(store.groups())
+    # print(store.groups())
+
 
 def delete_sps(store):
     store.remove('sp/')
@@ -128,10 +168,11 @@ def delete_sps(store):
 #                name specified in second arg")
 # print(vars(ap.parse_args()))
 
+
 filename = "taxi_store.h5"
 
 """ initial_convert """
-#initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
+# initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
 
 """ stop point calculation """
 # calculate_sp(connect_to_store(filename),1000, 50, 3)
@@ -142,7 +183,12 @@ filename = "taxi_store.h5"
 # read_clusters(connect_to_store(filename),0)
 # delete_clusters(connect_to_store(filename))
 
+
+""" cluster sequences """
+create_cluster_sequence(connect_to_store(filename), 300, 1)
+# get_sp(connect_to_store(filename),300)
+
 # store = connect_to_store(filename)
-# df = store.get('sp/t{}'.format(300))
+# df = store.get('clusters/l{}'.format(1))
 # print(df)
 # store.close()
