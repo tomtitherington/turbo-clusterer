@@ -110,18 +110,22 @@ def distance(c1, c2):
 
 
 def find_cluster(clusters, long, lat):
+    print(long,lat)
     c_index = 0
-    # c_distance = distance(
-    #     (long, lat), (clusters[0]['centroid_0'], clusters[0]['centroid_1']))
-    #clusters.iat[i, 2]
     c_distance = distance(
-        (long, lat), (clusters.iat[0, 7], clusters.iat[0, 8]))
-    for index, row in clusters.iloc[1:].iterrows():
+         (clusters.iat[0, 7], clusters.iat[0, 8]), (long, lat) )
+    index = 1
+    for _, row in clusters.iloc[1:].iterrows():
+        #print("index {}, centroid0 {}, centroid1 {}".format(index,row['centroid_0'],row['centroid_1']))
+
         dist = distance((row['centroid_0'], row['centroid_1']), (long, lat))
         if dist < c_distance:
+            #print("index: {}".format(index))
             c_index = index
             c_distance = dist
-    return clusters.iat[c_index,1]
+        index+=1
+    # print('c index: {}'.format(c_index))
+    return clusters.iat[c_index,0]
 
 
 def create_cluster_sequence(store, taxi, layer):
@@ -131,16 +135,21 @@ def create_cluster_sequence(store, taxi, layer):
     except:
         print("Clusters at layer {} could not be opened".format(layer))
         return
-    # NOTE: worth rebuilding the tree and then querying instead?
+    print(clusters)
     cluster_seq = np.array([])
     for index, row in taxi_sp.iterrows():
         cluster = find_cluster(clusters, row['longitude'], row['latitude'])
+        #print('cluster id: {}'.format(cluster))
         cluster_seq = np.append(cluster_seq, cluster)
-    print("Stop point count {}, Cluster sequence count {}".format(len(taxi_sp.index),cluster_seq.size ))
     taxi_sp['clusters'] = cluster_seq
+    print(cluster_seq)
     store.append("sp/t{}".format(taxi), taxi_sp,  format='table',
                  append=False, index=False)
 
+
+def create_cluster_sequences(store, r, layer):
+    for taxi in (r[0],r[1]):
+        create_cluster_sequence(store, taxi, layer)
 
 def get_sp(store, taxi):
     return store.get('sp/t{}'.format(taxi))
@@ -186,7 +195,7 @@ filename = "taxi_store.h5"
 
 """ cluster sequences """
 create_cluster_sequence(connect_to_store(filename), 300, 1)
-# get_sp(connect_to_store(filename),300)
+# print(get_sp(connect_to_store(filename),300))
 
 # store = connect_to_store(filename)
 # df = store.get('clusters/l{}'.format(1))
