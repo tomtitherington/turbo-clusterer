@@ -70,7 +70,7 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
     Raises:
         ....
     """
-    for i in range(1, n + 1):
+    for i in range(n[0], n[1]):
         try:
             log = store.get('logs/t{}'.format(i))
         except:
@@ -110,10 +110,10 @@ def distance(c1, c2):
 
 
 def find_cluster(clusters, long, lat):
-    print(long,lat)
+    print(long, lat)
     c_index = 0
     c_distance = distance(
-         (clusters.iat[0, 7], clusters.iat[0, 8]), (long, lat) )
+        (clusters.iat[0, 7], clusters.iat[0, 8]), (long, lat))
     index = 1
     for _, row in clusters.iloc[1:].iterrows():
         #print("index {}, centroid0 {}, centroid1 {}".format(index,row['centroid_0'],row['centroid_1']))
@@ -123,9 +123,9 @@ def find_cluster(clusters, long, lat):
             #print("index: {}".format(index))
             c_index = index
             c_distance = dist
-        index+=1
+        index += 1
     # print('c index: {}'.format(c_index))
-    return clusters.iat[c_index,0]
+    return clusters.iat[c_index, 0]
 
 
 def create_cluster_sequence(store, taxi, layer):
@@ -141,15 +141,21 @@ def create_cluster_sequence(store, taxi, layer):
         cluster = find_cluster(clusters, row['longitude'], row['latitude'])
         #print('cluster id: {}'.format(cluster))
         cluster_seq = np.append(cluster_seq, cluster)
-    taxi_sp['clusters'] = cluster_seq
+    taxi_sp['cluster'] = cluster_seq
     print(cluster_seq)
     store.append("sp/t{}".format(taxi), taxi_sp,  format='table',
                  append=False, index=False)
 
 
 def create_cluster_sequences(store, r, layer):
-    for taxi in (r[0],r[1]):
+    for taxi in (r[0], r[1]):
         create_cluster_sequence(store, taxi, layer)
+
+def read_clusterseq(store, taxi):
+    df = store.get('sp/t{}'.format(taxi))
+    for _, row in df.iterrows():
+        print(row)
+        print("\n")
 
 def get_sp(store, taxi):
     return store.get('sp/t{}'.format(taxi))
@@ -171,11 +177,37 @@ def delete_sps(store):
     store.remove('sp/')
     store.close()
 
-# ap = argparse.ArgumentParser()
-# ap.add_argument("-c", "--convert", nargs=2, required=True,
-#                help="Convert the files specified first arg (directory) into a single HDF5 with \
-#                name specified in second arg")
-# print(vars(ap.parse_args()))
+
+ap = argparse.ArgumentParser()
+# Default action to complete the whole process or just create the file?
+# MOBAL
+ap.add_argument('store', metavar='STORE', nargs=1,
+                help='the name of the HDF5 store file')
+ap.add_argument('--convert', metavar='INDIR', nargs=1,
+                help='the directory path of the csv file(s) to be converted and placed in the stores')
+ap.add_argument('--spoints', metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'DISTANCE_THRESH', 'TIME_THRESH'), nargs=4,
+                help='calculate stop points within the specified range, with time and distance threshold')
+ap.add_argument('--cluster', nargs=4, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'ORDER', 'THRESH'),
+                help='cluster the stop points of taxis in a specified range with branching factor and threshold')
+ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'LAYER'),
+                help='find the sequence of visited clusters in a specified layer of the tree')
+ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
+args = ap.parse_args()
+
+if args.convert:
+    initial_convert(
+        *args.store, *args.convert)  # initial convertion
+if args.spoints:
+    calculate_sp(connect_to_store(
+        *args.store), (args.spoints[0], args.spoints[1]), args.spoints[2], args.spoints[3])  # stop point calculation
+if args.cluster:
+    cluster_sp(connect_to_store(
+        args.store[0]), args.cluster[2], args.cluster[3], (args.cluster[0], args.cluster[1]))  # stop point clustering
+if args.clusterseq:
+    create_cluster_sequences(connect_to_store(
+        store), (args.clusterseq[0], args.clusterseq[1]), args.clusterseq[2]) # cluster sequences
+if args.read_clusterseq:
+    read_clusterseq(connect_to_store(*args.store),*args.read_clusterseq)
 
 
 filename = "taxi_store.h5"
@@ -194,10 +226,5 @@ filename = "taxi_store.h5"
 
 
 """ cluster sequences """
-create_cluster_sequence(connect_to_store(filename), 300, 1)
+# create_cluster_sequence(connect_to_store(filename), 300, 1)
 # print(get_sp(connect_to_store(filename),300))
-
-# store = connect_to_store(filename)
-# df = store.get('clusters/l{}'.format(1))
-# print(df)
-# store.close()
