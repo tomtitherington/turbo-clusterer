@@ -254,7 +254,7 @@ class Node(object):
             df = pd.DataFrame([cluster_record], columns=[
                               "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"])
             store.append("clusters/l{}".format(layer),
-                         df, format='table', index=False)
+                         df, format='table', data_columns=['cluster'])
             __CID__ += 1
         for child in self.children:
             child.save_node(layer + 1, store)

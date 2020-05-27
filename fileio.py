@@ -116,8 +116,6 @@ def find_cluster(clusters, long, lat):
         (clusters.iat[0, 7], clusters.iat[0, 8]), (long, lat))
     index = 1
     for _, row in clusters.iloc[1:].iterrows():
-        #print("index {}, centroid0 {}, centroid1 {}".format(index,row['centroid_0'],row['centroid_1']))
-
         dist = distance((row['centroid_0'], row['centroid_1']), (long, lat))
         if dist < c_distance:
             #print("index: {}".format(index))
@@ -137,7 +135,7 @@ def create_cluster_sequence(store, taxi, layer):
         return
     print(clusters)
     cluster_seq = np.array([])
-    for index, row in taxi_sp.iterrows():
+    for _, row in taxi_sp.iterrows():
         cluster = find_cluster(clusters, row['longitude'], row['latitude'])
         #print('cluster id: {}'.format(cluster))
         cluster_seq = np.append(cluster_seq, cluster)
@@ -151,11 +149,13 @@ def create_cluster_sequences(store, r, layer):
     for taxi in (r[0], r[1]):
         create_cluster_sequence(store, taxi, layer)
 
+
 def read_clusterseq(store, taxi):
     df = store.get('sp/t{}'.format(taxi))
     for _, row in df.iterrows():
         print(row)
         print("\n")
+
 
 def get_sp(store, taxi):
     return store.get('sp/t{}'.format(taxi))
@@ -178,11 +178,18 @@ def delete_sps(store):
     store.close()
 
 
+def delete_group(store, group):
+    store.remove(group)
+    store.close()
+
+
 ap = argparse.ArgumentParser()
 # Default action to complete the whole process or just create the file?
 # MOBAL
 ap.add_argument('store', metavar='STORE', nargs=1,
                 help='the name of the HDF5 store file')
+ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
+                help='delete a group within the HDF5 store from the choices listed')
 ap.add_argument('--convert', metavar='INDIR', nargs=1,
                 help='the directory path of the csv file(s) to be converted and placed in the stores')
 ap.add_argument('--spoints', metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'DISTANCE_THRESH', 'TIME_THRESH'), nargs=4,
@@ -194,6 +201,8 @@ ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', '
 ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
 args = ap.parse_args()
 
+if args.delete:
+    delete_group(connect_to_store(*args.store), args.delete)
 if args.convert:
     initial_convert(
         *args.store, *args.convert)  # initial convertion
@@ -202,12 +211,12 @@ if args.spoints:
         *args.store), (args.spoints[0], args.spoints[1]), args.spoints[2], args.spoints[3])  # stop point calculation
 if args.cluster:
     cluster_sp(connect_to_store(
-        args.store[0]), args.cluster[2], args.cluster[3], (args.cluster[0], args.cluster[1]))  # stop point clustering
+        args.store[0]), int(args.cluster[2]), float(args.cluster[3]), (int(args.cluster[0]), int(args.cluster[1])))  # stop point clustering
 if args.clusterseq:
     create_cluster_sequences(connect_to_store(
-        store), (args.clusterseq[0], args.clusterseq[1]), args.clusterseq[2]) # cluster sequences
+        store), (args.clusterseq[0], args.clusterseq[1]), args.clusterseq[2])  # cluster sequences
 if args.read_clusterseq:
-    read_clusterseq(connect_to_store(*args.store),*args.read_clusterseq)
+    read_clusterseq(connect_to_store(*args.store), *args.read_clusterseq)
 
 
 filename = "taxi_store.h5"
