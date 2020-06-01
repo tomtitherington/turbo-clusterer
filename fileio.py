@@ -21,7 +21,7 @@ def read_log(filename):
     return df
 
 
-def initial_convert(filename, data_path):
+def initial_convert(store, data_path):
     """Converts logs from CSV(s) into a HDF5 file.
 
     Converts *all* log files found in the directory (none recursive), into a single HDF5 file
@@ -37,13 +37,11 @@ def initial_convert(filename, data_path):
     Raises:
         ....
     """
-    store = connect_to_store(filename)
     for name in os.listdir(data_path):
         fullpath = os.path.join(data_path, name)
         if os.path.isfile(fullpath):
             store.append("logs/t{}".format(os.path.splitext(name)[0]), read_log(fullpath),
                          data_columns=['date_time'], format='table')
-    store.close()
 
 
 def store_sp_from_csv(store, n):
@@ -52,7 +50,6 @@ def store_sp_from_csv(store, n):
         # distance threshold = 50 meters - time threshold = 3 minutes
         sp = spd.detect(log, len(log.index), 50, 3)
         store.append("sp/{}".format(i), sp)
-    store.close()
 
 
 def calculate_sp(store, n, delta_d=50, delta_t=3):
@@ -78,7 +75,6 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
             continue
         sp = spd.detect(log, len(log.index), delta_d, delta_t)
         store.append("sp/t{}".format(i), sp, format='table', index=False)
-    store.close()
 
 
 def cluster_sp(store, order, threshold, r):
@@ -94,7 +90,6 @@ def cluster_sp(store, order, threshold, r):
         for index, row in lnglats.iterrows():
             tree.insert_point(row.values)
     tree.save_tree(store)
-    store.close()
 
 # "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"
 
@@ -118,11 +113,9 @@ def find_cluster(clusters, long, lat):
     for _, row in clusters.iloc[1:].iterrows():
         dist = distance((row['centroid_0'], row['centroid_1']), (long, lat))
         if dist < c_distance:
-            #print("index: {}".format(index))
             c_index = index
             c_distance = dist
         index += 1
-    # print('c index: {}'.format(c_index))
     return clusters.iat[c_index, 0]
 
 
@@ -131,7 +124,7 @@ def create_cluster_sequence(store, taxi, layer):
         clusters = store.get('clusters/l{}'.format(layer))
         taxi_sp = store.get('sp/t{}'.format(taxi))
     except:
-        print("Clusters at layer {} could not be opened".format(layer))
+        print("Cluster sequence at layer {} could not be calculated".format(layer))
         return
     print(clusters)
     cluster_seq = np.array([])
@@ -163,33 +156,28 @@ def get_sp(store, taxi):
 
 def read_clusters(store, layer):
     clusters = store.get('clusters/l{}'.format(0))
-    store.close()
     print(clusters)
 
 
 def delete_clusters(store):
     store.remove('clusters/')
-    store.close()
-    # print(store.groups())
+
+def keys(store):
+    print(store.keys())
 
 
 def delete_sps(store):
     store.remove('sp/')
-    store.close()
 
 
 def delete_group(store, group):
     store.remove(group)
-    store.close()
 
 
 ap = argparse.ArgumentParser()
-# Default action to complete the whole process or just create the file?
 # MOBAL
-ap.add_argument('store', metavar='STORE', nargs=1,
+ap.add_argument('store', metavar='STORE', nargs=1, default='taxi_store.h5',
                 help='the name of the HDF5 store file')
-ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
-                help='delete a group within the HDF5 store from the choices listed')
 ap.add_argument('--convert', metavar='INDIR', nargs=1,
                 help='the directory path of the csv file(s) to be converted and placed in the stores')
 ap.add_argument('--spoints', metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'DISTANCE_THRESH', 'TIME_THRESH'), nargs=4,
@@ -199,41 +187,26 @@ ap.add_argument('--cluster', nargs=4, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'ORD
 ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'LAYER'),
                 help='find the sequence of visited clusters in a specified layer of the tree')
 ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
+ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
+                help='delete a group within the HDF5 store from the choices listed')
 args = ap.parse_args()
 
-if args.delete:
-    delete_group(connect_to_store(*args.store), args.delete)
+
+store = connect_to_store(*args.store)
 if args.convert:
     initial_convert(
-        *args.store, *args.convert)  # initial convertion
+        store, *args.convert)  # initial convertion
+if args.delete:
+    delete_group(store, args.delete)
 if args.spoints:
-    calculate_sp(connect_to_store(
-        *args.store), (args.spoints[0], args.spoints[1]), args.spoints[2], args.spoints[3])  # stop point calculation
+    calculate_sp(store, (args.spoints[0], args.spoints[1]), args.spoints[2], args.spoints[3])  # stop point calculation
 if args.cluster:
-    cluster_sp(connect_to_store(
-        args.store[0]), int(args.cluster[2]), float(args.cluster[3]), (int(args.cluster[0]), int(args.cluster[1])))  # stop point clustering
+    cluster_sp(store, int(args.cluster[2]), float(args.cluster[3]), (int(args.cluster[0]), int(args.cluster[1])))  # stop point clustering
 if args.clusterseq:
-    create_cluster_sequences(connect_to_store(
-        store), (args.clusterseq[0], args.clusterseq[1]), args.clusterseq[2])  # cluster sequences
+    create_cluster_sequences(store, (int(args.clusterseq[0]), int(args.clusterseq[1])), int(args.clusterseq[2]))  # cluster sequences
 if args.read_clusterseq:
-    read_clusterseq(connect_to_store(*args.store), *args.read_clusterseq)
+    read_clusterseq(store, *args.read_clusterseq)
 
+keys(store)
 
-filename = "taxi_store.h5"
-
-""" initial_convert """
-# initial_convert("taxi_store.h5", "release/taxi_log_2008_by_id/")
-
-""" stop point calculation """
-# calculate_sp(connect_to_store(filename),1000, 50, 3)
-# delete_sps(connect_to_store(filename))
-
-""" clustering """
-# cluster_sp(connect_to_store(filename),50, 0.5, (1,1000))
-# read_clusters(connect_to_store(filename),0)
-# delete_clusters(connect_to_store(filename))
-
-
-""" cluster sequences """
-# create_cluster_sequence(connect_to_store(filename), 300, 1)
-# print(get_sp(connect_to_store(filename),300))
+store.close()
