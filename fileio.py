@@ -40,6 +40,7 @@ def initial_convert(store, data_path):
     for name in os.listdir(data_path):
         fullpath = os.path.join(data_path, name)
         if os.path.isfile(fullpath):
+            print("writing log: {}".format(os.path.splitext(name)[0]))
             store.append("logs/t{}".format(os.path.splitext(name)[0]), read_log(fullpath),
                          data_columns=['date_time'], format='table')
 
@@ -49,7 +50,7 @@ def store_sp_from_csv(store, n):
         log = read_log("release/taxi_log_2008_by_id/{}.txt".format(i))
         # distance threshold = 50 meters - time threshold = 3 minutes
         sp = spd.detect(log, len(log.index), 50, 3)
-        store.append("sp/{}".format(i), sp)
+        store.append("sp/t{}".format(i), sp)
 
 
 def calculate_sp(store, n, delta_d=50, delta_t=3):
@@ -67,6 +68,7 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
     Raises:
         ....
     """
+    avg_sps = 0
     for i in range(n[0], n[1]):
         try:
             log = store.get('logs/t{}'.format(i))
@@ -74,7 +76,12 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
             print("File logs/t{} could not be opened".format(i))
             continue
         sp = spd.detect(log, len(log.index), delta_d, delta_t)
-        store.append("sp/t{}".format(i), sp, format='table', index=False)
+        avg_sps += len(sp.index)
+        print("{} stop points generated for taxi {}".format(len(sp.index), i))
+        #store.append("sp/t{}".format(i), sp, format='table', index=False)
+        store.append("sp/", sp, format='table', index=False)
+    print("average number of stop points per log: {}".format(
+        avg_sps / (n[1] - n[0])))
 
 
 def cluster_sp(store, order, threshold, r):
@@ -159,8 +166,14 @@ def read_clusters(store, layer):
     print(clusters)
 
 
+def readstore_log(store, taxi):
+    log = store.get('logs/t{}'.format(taxi))
+    print(log)
+
+
 def delete_clusters(store):
     store.remove('clusters/')
+
 
 def keys(store):
     print(store.keys())
@@ -187,6 +200,7 @@ ap.add_argument('--cluster', nargs=4, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'ORD
 ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'LAYER'),
                 help='find the sequence of visited clusters in a specified layer of the tree')
 ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
+ap.add_argument('--read_log', nargs=1, metavar=('TAXI_ID'))
 ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
                 help='delete a group within the HDF5 store from the choices listed')
 args = ap.parse_args()
@@ -199,14 +213,18 @@ if args.convert:
 if args.delete:
     delete_group(store, args.delete)
 if args.spoints:
-    calculate_sp(store, (args.spoints[0], args.spoints[1]), args.spoints[2], args.spoints[3])  # stop point calculation
+    calculate_sp(store, (int(args.spoints[0]), int(args.spoints[1])), float(
+        args.spoints[2]), float(args.spoints[3]))  # stop point calculation
 if args.cluster:
-    cluster_sp(store, int(args.cluster[2]), float(args.cluster[3]), (int(args.cluster[0]), int(args.cluster[1])))  # stop point clustering
+    cluster_sp(store, int(args.cluster[2]), float(args.cluster[3]), (int(
+        args.cluster[0]), int(args.cluster[1])))  # stop point clustering
 if args.clusterseq:
-    create_cluster_sequences(store, (int(args.clusterseq[0]), int(args.clusterseq[1])), int(args.clusterseq[2]))  # cluster sequences
+    create_cluster_sequences(store, (int(args.clusterseq[0]), int(
+        args.clusterseq[1])), int(args.clusterseq[2]))  # cluster sequences
 if args.read_clusterseq:
-    read_clusterseq(store, *args.read_clusterseq)
+    read_clusterseq(store, int(*args.read_clusterseq))
+if args.read_log:
+    readstore_log(store, int(*args.read_log))
 
-keys(store)
 
 store.close()
