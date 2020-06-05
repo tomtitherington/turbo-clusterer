@@ -75,7 +75,8 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         except:
             print("File logs/t{} could not be opened".format(i))
             continue
-        sp = spd.detect(log, len(log.index), delta_d, delta_t)
+        #sp = spd.detect(log, len(log.index), delta_d, delta_t)
+        sp = spd.get_stops(log, len(log.index), delta_d, delta_t)
         avg_sps += len(sp.index)
         print("{} stop points generated for taxi {}".format(len(sp.index), i))
         #store.append("sp/t{}".format(i), sp, format='table', index=False)
@@ -86,17 +87,22 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
 
 def cluster_sp(store, order, threshold, r):
     tree = cft.CFTree(order, threshold)
-    # read each taxis stop points in range r
-    for i in range(r[0], r[1]):
-        try:
-            df = store.get('sp/t{}'.format(i))
-        except:
-            print("File sp/t{} could not be opened".format(i))
-            continue
-        lnglats = df[['longitude', 'latitude']]
-        for index, row in lnglats.iterrows():
+    for chunk in store.select('sp', chunksize=10000):
+        for _, row in (chunk[['longitude','latitude']]).iterrows():
             tree.insert_point(row.values)
     tree.save_tree(store)
+
+    # # read each taxis stop points in range r
+    # for i in range(r[0], r[1]):
+    #     try:
+    #         df = store.get('sp/t{}'.format(i))
+    #     except:
+    #         print("File sp/t{} could not be opened".format(i))
+    #         continue
+    #     lnglats = df[['longitude', 'latitude']]
+    #     for index, row in lnglats.iterrows():
+    #         tree.insert_point(row.values)
+    # tree.save_tree(store)
 
 # "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"
 

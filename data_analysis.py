@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import stop_point_detection as sp
+import cf_tree as cft
+import seaborn as sns
 
 from yellowbrick.cluster import KElbowVisualizer
 from sklearn.cluster import KMeans, Birch
@@ -94,21 +96,105 @@ def stop_point_test(store):
     print("significant stops")
     print(len(df.index))
     # return
-    print(sp.get_stops(df, len(df.index), 200, 2))
+    print(sp.get_stops(df, len(df.index), 50, 3))
+    print(sp.get_stops(df, len(df.index), 100, 3))
 
 
-stop_point_test(store)
+def cluster_sp(store, order, threshold):
+    tree = cft.CFTree(order, threshold)
+    for chunk in store.select('sp', chunksize=10000):
+        for _, row in (chunk[['longitude', 'latitude']]).iterrows():
+            tree.insert_point(row.values)
+    tree.save_tree(store)
+
+
+def birch_compare(store, order, threshold):
+    # sklearn birch
+    set = store.select('sp')
+    df = set.filter(items=['longitude', 'latitude'])
+    brc = Birch(threshold=threshold, branching_factor=order, n_clusters=None)
+    sk_birch_centers = brc.fit(df).subcluster_centers_
+    #print("sk birch:")
+    # print(sk_birch_centers)
+    # cluster feature tree
+    tree = cft.CFTree(order, threshold)
+    for _, row in df.iterrows():
+        tree.insert_point(row.values)
+    tree.save_tree(store)
+
+    leaf_layer = clusters_at_max_height(store)
+    x = leaf_layer['centroid_0'].tolist()
+    y = leaf_layer['centroid_1'].tolist()
+    #cft_centers = list(zip(x,y))
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax1.scatter(*zip(*sk_birch_centers), c='b', marker="s", label='skbirch')
+    ax1.scatter(x, y, c='r', marker="o", label='cftree')
+    plt.legend(loc='upper left')
+    plt.show()
+    #print("cf tree:")
+    # print(leaf_layer)
+
+
+def clusters_at_max_height(store):
+    df = store.select('clusters')
+    max = df['layer'].max()
+    return df[df.layer == max]
+
+
+def get_leaf_centers(store):
+    df = store.select('clusters')
+    pd.set_option('display.max_rows', df.shape[0] + 1)
+    print(df)
+    return df['layer'].max()
+
+
+def plot_centers(store, centroids_layer):
+    clusters = store.select('clusters', where='layer == centroids_layer')
+    print(clusters)
+    cluster_filter = clusters.filter(
+        items=['centroid_0', 'centroid_1', 'n', 'radius'])
+    cluster_sum = cluster_filter[cluster_filter['n'] > 100]
+    pd.set_option('display.max_rows', cluster_sum.shape[0] + 1)
+    print(cluster_sum)
+    tips = sns.load_dataset("tips")
+    print(tips)
+    cmap = sns.cubehelix_palette(dark=.3, light=.8, as_cmap=True)
+    # ax = sns.scatterplot(x="centroid_0", y="centroid_1",
+    #                      hue="n", size="n",
+    #                      palette=cmap,
+    #                      sizes=(20, 200),
+    #                      data=cluster_sum)
+    # size should use the actual radius
+    # colour should be n (darker the more points)
+    plt.scatter(cluster_sum['centroid_0'], cluster_sum['centroid_1'], s=cluster_sum['n'],
+                c=cluster_sum['n'], cmap="Blues", alpha=0.4, edgecolors="grey", linewidth=2)
+    plt.show()
+
+# stop_point_test(store)
 
 # print(sample_elbow(store))
 # print(elbow_mode(store))
 
-# threhold = k_means_thresh(elbow_mode(store),store)
+# threshold = k_means_thresh(elbow_mode(store),store)
 # threhold = k_means_thresh(3,store)
-# print("heuristic threshold = {}".format(threhold))
+# print("heuristic threshold = {}".format(threshold))
 #
 # df = sample(store,10000)
 # long_lats = df.filter(items=['longitude','latitude'])
 #
+
+
+plot_centers(store, 1)
+
+threshold = 0.12203481466857011
+
+#birch_compare(store, 50, threshold)
+
+# cluster_sp(store, 50, threshold)
+# print(get_leaf_centers(store))
+
 # plot(long_lats,birch(long_lats, threhold[0]))
 # plot(long_lats,birch(long_lats, threhold[1]))
 # plot(long_lats,birch(long_lats, threhold[2]))

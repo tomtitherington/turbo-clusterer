@@ -55,24 +55,25 @@ def get_stops(df, df_size, dist_thresh, time_thresh):
     while i < df_size:
         #print("i: {}".format(i))
         j = i + 1
-        print("i: {}".format(i))
+        #print("i: {}".format(i))
         while j < df_size:
             #print("j: {}".format(j))
             dist = distance((df.iat[i, 2], df.iat[i, 3]),
                             (df.iat[j, 2], df.iat[j, 3]))
             # print(dist)
             if dist < dist_thresh:
+                #print("distance {} at i: {} j: {}".format(dist,i,j))
                 j += 1
-                print("distance is less than tresh at j: {}".format(j))
+                #print("distance is less than tresh at j: {}".format(j))
             else:
                 if j != (i + 1):
                     # the distance between i and j-1 is significant
                     j = j - 1
                     delta_t = timespan(df.iat[i, 1], df.iat[j, 1])
-                    print("delta_t: {}".format(delta_t))
-                    print("j: {}".format(j))
+                    #print("delta_t: {}".format(delta_t))
+                    #print("j: {}".format(j))
                     if delta_t > time_thresh:
-                        print("significant")
+                        #print("significant")
                         # the time AND distance between i and j - 1 is significant
                         stop_points['taxi_id'].append(df.iat[i, 0])
                         stop_points['arrival_dt'].append(df.iat[i, 1])
@@ -81,6 +82,9 @@ def get_stops(df, df_size, dist_thresh, time_thresh):
                             df.iloc[i:j + 1, 2], df.iloc[i:j + 1, 3], j - i + 1)
                         stop_points['longitude'].append(long)
                         stop_points['latitude'].append(lat)
+                    #re-adjust j so that arrival times and departure times are correct
+                    # if we did not increment j here we would find that i.departure = i+1.arrival
+                    j+=1
                     i = j
                     break
                 else:
@@ -89,7 +93,6 @@ def get_stops(df, df_size, dist_thresh, time_thresh):
                     break
         if not (j < df_size):
             break
-        #i+=1
     return pd.DataFrame(stop_points)
 
 # average of points within a threshold
