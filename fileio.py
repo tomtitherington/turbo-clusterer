@@ -80,7 +80,7 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         avg_sps += len(sp.index)
         print("{} stop points generated for taxi {}".format(len(sp.index), i))
         #store.append("sp/t{}".format(i), sp, format='table', index=False)
-        store.append("sp/", sp, format='table', index=False)
+        store.append("sp/", sp, format='table', index=True)
     print("average number of stop points per log: {}".format(
         avg_sps / (n[1] - n[0])))
 

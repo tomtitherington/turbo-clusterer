@@ -143,34 +143,63 @@ def clusters_at_max_height(store):
     return df[df.layer == max]
 
 
-def get_leaf_centers(store):
-    df = store.select('clusters')
+def get_leaf_centers(store, run):
+    df = store.select('clusters/r{}'.format(run))
     pd.set_option('display.max_rows', df.shape[0] + 1)
     print(df)
     return df['layer'].max()
 
 
-def plot_centers(store, centroids_layer):
-    clusters = store.select('clusters', where='layer == centroids_layer')
+def re_run(store, cluster_number, order, threshold, run):
+    print(store.get_storer('sp').nrows)
+    cluster = store.select('clusters', where='cluster == cluster_number')
+    radius = cluster['radius']
+    centroid_long = cluster['centroid_0']
+    centroid_lat = cluster['centroid_1']
+    print(centroid_lat)
+    tree = cft.CFTree(order, threshold)
+    for chunk in store.select('sp', chunksize=10000):
+        # where='(longitude - centroid_long)**2 <= radius & (latitude - centroid_lat)**2 <= radius'
+        chunk_filter = chunk.eval('(longitude - @centroid_long)**2 <= @radius & (latitude - @centroid_lat)**2 <= @radius', inplace=False)
+        # chunk_filter = chunk[(chunk['longitude'] - centroid_long)**2 <= radius ]
+        print(chunk_filter)
+        #for _, row in (chunk[['longitude', 'latitude']]).iterrows():
+            #print('working')
+            #tree.insert_point(row.values)
+    #tree.save_tree(store, run)
+
+
+def plot_centers(store, centroids_layer, run):
+    clusters = store.select('clusters/r{}'.format(run),
+                            where='layer == centroids_layer')
     print(clusters)
     cluster_filter = clusters.filter(
         items=['centroid_0', 'centroid_1', 'n', 'radius'])
     cluster_sum = cluster_filter[cluster_filter['n'] > 100]
+
+    areas = []
+    scalar = 10
+    for _, row in cluster_sum.iterrows():
+        areas.append(np.pi * row['radius']**2 * scalar)
+    cluster_sum['area'] = np.array(areas)
+
+    # for printing
     pd.set_option('display.max_rows', cluster_sum.shape[0] + 1)
     print(cluster_sum)
-    tips = sns.load_dataset("tips")
-    print(tips)
     cmap = sns.cubehelix_palette(dark=.3, light=.8, as_cmap=True)
-    # ax = sns.scatterplot(x="centroid_0", y="centroid_1",
-    #                      hue="n", size="n",
-    #                      palette=cmap,
-    #                      sizes=(20, 200),
-    #                      data=cluster_sum)
+    # change the radius to be the area of the cluster
+    ax = sns.scatterplot(x="centroid_0", y="centroid_1",
+                         hue="n", size="area",
+                         palette=cmap,
+                         data=cluster_sum)
+    ax.set(xlabel='Longitude', ylabel='Latitude')
+    #plt.legend(title='Cluster',labels=['Number of clusters', 'Area'])
     # size should use the actual radius
     # colour should be n (darker the more points)
-    plt.scatter(cluster_sum['centroid_0'], cluster_sum['centroid_1'], s=cluster_sum['n'],
-                c=cluster_sum['n'], cmap="Blues", alpha=0.4, edgecolors="grey", linewidth=2)
+    # plt.scatter(cluster_sum['centroid_0'], cluster_sum['centroid_1'], s=cluster_sum['n'],
+    #             c=cluster_sum['n'], cmap="Blues", alpha=0.4, edgecolors="grey", linewidth=2)
     plt.show()
+
 
 # stop_point_test(store)
 
@@ -185,10 +214,14 @@ def plot_centers(store, centroids_layer):
 # long_lats = df.filter(items=['longitude','latitude'])
 #
 
-
-plot_centers(store, 1)
+#print(get_leaf_centers(store,2))
+plot_centers(store, 0,2)
 
 threshold = 0.12203481466857011
+
+# clusters = store.select('clusters', where='layer == 1')
+# print(clusters[clusters.n > 10000])
+
 
 #birch_compare(store, 50, threshold)
 

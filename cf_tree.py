@@ -247,17 +247,17 @@ class Node(object):
             nodes.append(child.get_layer(current_layer + 1, target_layer))
         return nodes
 
-    def save_node(self, layer, store):
+    def save_node(self, layer, store, run):
         global __CID__
         for cf in self.cluster_features:
             cluster_record = np.array([__CID__, layer] + cf.array_contents())
             df = pd.DataFrame([cluster_record], columns=[
                               "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"])
-            store.append("clusters/",
+            store.append("clusters/r{}".format(run),
                          df, format='table', data_columns=['cluster','layer'])
             __CID__ += 1
         for child in self.children:
-            child.save_node(layer + 1, store)
+            child.save_node(layer + 1, store, run)
 
 
 class CFTree(object):
@@ -365,8 +365,8 @@ class CFTree(object):
         print(layer)
         return layer
 
-    def save_tree(self, store):
-        self.root.save_node(0, store)
+    def save_tree(self, store, run):
+        self.root.save_node(0, store, run)
 
 
 def test_clusterfeature(points):
