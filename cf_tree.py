@@ -4,16 +4,7 @@ import functools as ft
 import numpy as np
 import pandas as pd
 
-# NOTE: Branching factor cannot be 1 and possibly not 2 either, for performance reasons?
-# TODO: Create a distance metric class containing methods that correspond to the
-#       different distance metrics in the BIRCH paper, the CF tree will store a chosen method/metric
-#       as an attribute
-# TODO:
-#       1) Adapt CFtree and Node class to use np.array for ls.
-#       1) Carry on with testing the module.
-#       2) Add cluster id as an attribute to a cluster feature, last node id will need to be a global variable or at least a variable
-#           stored in the tree
-#       3) Complete the save tree function
+# NOTE: Using a branching factor of 1 or 2 will produce poor results
 
 __CID__ = 0
 
@@ -112,7 +103,7 @@ class Node(object):
         return self
 
     def _find(self, entry, type):
-        """Finds the cloest cluster to the entry.
+        """Finds the closest cluster to the entry.
 
         Determines the closest cluster relative to the entry cluster, within the node.
 
@@ -150,17 +141,12 @@ class Node(object):
         if new_cf.radius() < threshold:
             self.cluster_features[index] = new_cf
             if child is not None:
-                print("not good")
-                # NOTE: Don't think this case is ever possible since if they
-                # can be combined, they already will have been combined
                 self.children[index] += child
         else:
             self.cluster_features.append(entry)
             if child is not None:
                 self.children.append(child)
 
-    # seed split for leaf node and seed split for non leaf nodes
-    # in the case of the latter, the nodes children must be transfered
     def seed_split(self, threshold):
         """Splits the node into two nodes.
 
@@ -178,9 +164,7 @@ class Node(object):
             if self.cluster_features[i].distance_metric(self.cluster_features[j]) > max_dist:
                 l_index = i
                 r_index = j
-                # can set seed_l and seed_r here
 
-        # NOTE: May need to actually create a new CF so that all its pointer ties are erased?
         seed_l = self.cluster_features[l_index]
         seed_r = self.cluster_features[r_index]
         if self.children != []:
@@ -189,9 +173,6 @@ class Node(object):
         else:
             left = Node(self.order, [[seed_l], []])
             right = Node(self.order, [[seed_r], []])
-
-        # self.cluster_features.pop(l_index)
-        # self.cluster_features.pop(r_index)
 
         for i, cf in enumerate(self.cluster_features):
             if cf != seed_l and cf != seed_r:
@@ -205,7 +186,6 @@ class Node(object):
                         right.add_entry(cf, threshold)
                     else:
                         right.add_entry(cf, threshold, self.children[i])
-                # pop i?
 
         return left, right
 
@@ -293,12 +273,8 @@ class CFTree(object):
         return [[left_summary, right_summary], [left, right]]
 
     def _merge(self, parent, index, cfs, children):
-        # CFs within a node are not sorted as there is no condition to sort by
-        # that would speed up insertions and retrievals
-
         parent.cluster_features[index] = cfs[0]
         parent.children[index] = children[0]
-
         parent.cluster_features = parent.cluster_features[: index] + \
             [cfs[1]] + parent.cluster_features[index:]
         parent.children = parent.children[: index] + \
@@ -308,7 +284,9 @@ class CFTree(object):
         """Inserts a point after traversing to a leaf node.
 
         If the leaf node is full, split the leaf node into two, and add to the parent node.
-        Repeat up to the first ancestor with free space.
+        Repeat up to the first ancestor with free space. Index contains the position (index)
+        of the child node in the parent this must be modified to now represent one of the split nodes,
+        and another cf must be inserted into the parent to represent the another split node.
 
         Args:
             self (CFTree): A Cluster Feature tree instance.
@@ -327,12 +305,6 @@ class CFTree(object):
 
         child.add_entry(entry_cluster, self.threshold)
 
-        # index contains the position (index) of the child node in the parent
-        # this must be modified to now represent one of the split nodes,
-        # and another cf must be inserted into the parent to represent the another
-        # split node
-
-        # not sure this is sound syntax
         for parent, index in reversed(parents):
             if child.is_full():
                 # we must split
@@ -354,8 +326,6 @@ class CFTree(object):
                     # must update all ancestors of the child
                     parent.cluster_features[index] = child._summarise()
                     child = parent
-
-        # refinement step done here
 
     def show(self):
         self.root.show(0)
@@ -432,9 +402,9 @@ def test_tree(order, points, threshold):
 def test_module():
     points = np.array([[2, 3], [2, 2], [1, 3], [10, 11], [11, 11], [10, 12]])
     threshold = 0.001
-    order = 4
-    # test_clusterfeature(points.copy())
-    # test_node(order,points.copy(), threshold)
+    order = 2
+    test_clusterfeature(points.copy())
+    test_node(order,points.copy(), threshold)
     test_tree(order, points, threshold)
 
 

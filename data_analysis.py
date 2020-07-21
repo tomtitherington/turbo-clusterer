@@ -196,10 +196,20 @@ def plot_centers(store, centroids_layer, run):
     #plt.legend(title='Cluster',labels=['Number of clusters', 'Area'])
     # size should use the actual radius
     # colour should be n (darker the more points)
-    # plt.scatter(cluster_sum['centroid_0'], cluster_sum['centroid_1'], s=cluster_sum['n'],
-    #             c=cluster_sum['n'], cmap="Blues", alpha=0.4, edgecolors="grey", linewidth=2)
+    #plt.scatter( x='centroid_0', y='centroid_1', s='radius', c='n', cmap="Blues", alpha=0.4, edgecolors="grey", linewidth=2, data=cluster_sum)
     plt.show()
 
+def split_sp(store,day):
+    for chunk in store.select('sp', chunksize=10000):
+        print(chunk)
+        mask = (chunk['arrival_dt'] >= '2008-02-0{}'.format(day)) & (chunk['departure_dt'] < '2008-02-0{}'.format(day+1))
+        chunk = chunk.loc[mask]
+        store.append('sp/d{}'.format(day),chunk)
+
+#split_sp(store,8)
+
+# for i in range(2,8):
+#     split_sp(store,i)
 
 # stop_point_test(store)
 
@@ -215,9 +225,9 @@ def plot_centers(store, centroids_layer, run):
 #
 
 #print(get_leaf_centers(store,2))
-plot_centers(store, 0,2)
+#plot_centers(store, 2,23)
 
-threshold = 0.12203481466857011
+#threshold = 0.12203481466857011
 
 # clusters = store.select('clusters', where='layer == 1')
 # print(clusters[clusters.n > 10000])

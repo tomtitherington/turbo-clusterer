@@ -47,33 +47,28 @@ def distance(p_i, p_j):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c  # in meters
 
-
+"""
+Adaption of the stay point algorithm below. Addresses some of the issues with the solution presented by Zheng. Since
+Zhengs solution is more of an average, it misses some points out, the algorithm below does not. Either algorithms obtain
+decent results.
+"""
 def get_stops(df, df_size, dist_thresh, time_thresh):
     i = 0
     stop_points = {'taxi_id': [], 'arrival_dt': [], 'departure_dt': [],
                    'longitude': [], 'latitude': []}
     while i < df_size:
-        #print("i: {}".format(i))
         j = i + 1
-        #print("i: {}".format(i))
         while j < df_size:
-            #print("j: {}".format(j))
             dist = distance((df.iat[i, 2], df.iat[i, 3]),
                             (df.iat[j, 2], df.iat[j, 3]))
-            # print(dist)
             if dist < dist_thresh:
-                #print("distance {} at i: {} j: {}".format(dist,i,j))
                 j += 1
-                #print("distance is less than tresh at j: {}".format(j))
             else:
                 if j != (i + 1):
                     # the distance between i and j-1 is significant
                     j = j - 1
                     delta_t = timespan(df.iat[i, 1], df.iat[j, 1])
-                    #print("delta_t: {}".format(delta_t))
-                    #print("j: {}".format(j))
                     if delta_t > time_thresh:
-                        #print("significant")
                         # the time AND distance between i and j - 1 is significant
                         stop_points['taxi_id'].append(df.iat[i, 0])
                         stop_points['arrival_dt'].append(df.iat[i, 1])
@@ -95,9 +90,7 @@ def get_stops(df, df_size, dist_thresh, time_thresh):
             break
     return pd.DataFrame(stop_points)
 
-# average of points within a threshold
-
-
+"""Implementation of the stop point detection algorithm in Zheng paper. More of an average of points."""
 def detect(df, df_size, dist_thresh, time_thresh):
     i = 0
     stop_points = {'taxi_id': [], 'arrival_dt': [], 'departure_dt': [],
@@ -121,6 +114,5 @@ def detect(df, df_size, dist_thresh, time_thresh):
                 break
             j += 1
         break
-        #i += 1
 
     return pd.DataFrame(stop_points)

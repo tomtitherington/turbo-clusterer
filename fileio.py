@@ -8,6 +8,7 @@ import argparse
 
 import stop_point_detection as spd
 import cf_tree as cft
+import cluster
 
 
 def connect_to_store(filename):
@@ -79,32 +80,27 @@ def calculate_sp(store, n, delta_d=50, delta_t=3):
         sp = spd.get_stops(log, len(log.index), delta_d, delta_t)
         avg_sps += len(sp.index)
         print("{} stop points generated for taxi {}".format(len(sp.index), i))
-        #store.append("sp/t{}".format(i), sp, format='table', index=False)
         store.append("sp/", sp, format='table', index=True)
     print("average number of stop points per log: {}".format(
         avg_sps / (n[1] - n[0])))
 
 
-def cluster_sp(store, order, threshold, r):
-    tree = cft.CFTree(order, threshold)
+def split_sp(store, day):
     for chunk in store.select('sp', chunksize=10000):
-        for _, row in (chunk[['longitude','latitude']]).iterrows():
-            tree.insert_point(row.values)
-    tree.save_tree(store)
+        print(chunk)
+        mask = (chunk['arrival_dt'] >= '2008-02-0{}'.format(day)
+                ) & (chunk['departure_dt'] < '2008-02-0{}'.format(day + 1))
+        chunk = chunk.loc[mask]
+        store.append('sp/d{}'.format(day), chunk)
 
-    # # read each taxis stop points in range r
-    # for i in range(r[0], r[1]):
-    #     try:
-    #         df = store.get('sp/t{}'.format(i))
-    #     except:
-    #         print("File sp/t{} could not be opened".format(i))
-    #         continue
-    #     lnglats = df[['longitude', 'latitude']]
-    #     for index, row in lnglats.iterrows():
-    #         tree.insert_point(row.values)
-    # tree.save_tree(store)
 
-# "cluster", "layer", "n", "ls_0", "ls_1", "ss", "radius", "centroid_0", "centroid_1"
+def day_split(store):
+    for i in range(2, 9):
+        split_sp(store, i)
+
+
+def cluster_sp(store, day, order, threshold=None):
+    cluster.create_clusters(store, day, order, threshold)
 
 
 def distance(c1, c2):
@@ -113,8 +109,6 @@ def distance(c1, c2):
     x *= x
     y *= y
     return np.sqrt(x + y)
-
-# TODO: must change to use the syntax of a data frame, see point clustering file
 
 
 def find_cluster(clusters, long, lat):
@@ -193,6 +187,10 @@ def delete_group(store, group):
     store.remove(group)
 
 
+def delete_cluster_run(store, day, order):
+    store.remove('clusters/r{}'.format(day + order))
+
+
 ap = argparse.ArgumentParser()
 # MOBAL
 ap.add_argument('store', metavar='STORE', nargs=1, default='taxi_store.h5',
@@ -201,12 +199,17 @@ ap.add_argument('--convert', metavar='INDIR', nargs=1,
                 help='the directory path of the csv file(s) to be converted and placed in the stores')
 ap.add_argument('--spoints', metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'DISTANCE_THRESH', 'TIME_THRESH'), nargs=4,
                 help='calculate stop points within the specified range, with time and distance threshold')
-ap.add_argument('--cluster', nargs=4, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'ORDER', 'THRESH'),
-                help='cluster the stop points of taxis in a specified range with branching factor and threshold')
+ap.add_argument('--sp_day_split', help='splits the stop points by day')
+ap.add_argument('--auto_cluster', nargs=2, metavar=('DAY', 'ORDER'),
+                help='cluster the stop points for the day and order specified with automatic threshold')
+ap.add_argument('--cluster', nargs=3, metavar=('DAY', 'ORDER', 'THRESH'),
+                help='cluster the stop points for the day, order and threshold specified')
 ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'LAYER'),
                 help='find the sequence of visited clusters in a specified layer of the tree')
 ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
 ap.add_argument('--read_log', nargs=1, metavar=('TAXI_ID'))
+ap.add_argument('--delete_run', nargs=2, metavar=('DAY', 'ORDER'),
+                help='delete the clusters produced run on a specific day and order value')
 ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
                 help='delete a group within the HDF5 store from the choices listed')
 args = ap.parse_args()
@@ -216,14 +219,21 @@ store = connect_to_store(*args.store)
 if args.convert:
     initial_convert(
         store, *args.convert)  # initial convertion
+if args.delete_run:
+    delete_cluster_run(store, args.delete_run[0], args.delete_run[1])
 if args.delete:
     delete_group(store, args.delete)
 if args.spoints:
     calculate_sp(store, (int(args.spoints[0]), int(args.spoints[1])), float(
         args.spoints[2]), float(args.spoints[3]))  # stop point calculation
+if args.sp_day_split:
+    day_split(store)
+if args.auto_cluster:
+    cluster_sp(store, int(args.auto_cluster[0]), int(
+        args.auto_cluster[1]))  # auto stop point clustering
 if args.cluster:
-    cluster_sp(store, int(args.cluster[2]), float(args.cluster[3]), (int(
-        args.cluster[0]), int(args.cluster[1])))  # stop point clustering
+    cluster_sp(store, int(
+        args.cluster[0]), int(args.cluster[1]), float(args.cluster[2]))  # stop point clustering
 if args.clusterseq:
     create_cluster_sequences(store, (int(args.clusterseq[0]), int(
         args.clusterseq[1])), int(args.clusterseq[2]))  # cluster sequences
