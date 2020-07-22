@@ -35,7 +35,9 @@ def create_tree_per_day(store, order, threshold, run, day):
             tree.insert_point(row.values)
     tree.save_tree(store, run)
 
-
+"""
+Main.
+"""
 def create_clusters(store, day, order, threshold):
     # Automatic threshold calculation
     if threshold is None:
@@ -59,6 +61,10 @@ def create_clusters(store, day, order, threshold):
         # area
         catchment.append(np.pi * dist**2)
     cluster_filter['size'] = catchment
+    pd.set_option('display.max_rows', df.shape[0] + 1)
+    print("Date: 0{}-02-2008".format(day))
+    print("Clusters:")
+    print(cluster_filter)
     cmap = sns.cubehelix_palette(dark=.3, light=.8, as_cmap=True)
     plt.scatter(x="centroid_0", y="centroid_1", s="size", c="n",
                 cmap='Reds', alpha=0.7, data=cluster_filter)

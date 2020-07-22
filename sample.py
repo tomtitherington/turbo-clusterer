@@ -27,21 +27,10 @@ def sample(store, n_samples, day):
     r = np.random.randint(0, nrows, size=n_samples)
     samples = store.select('sp/d{}'.format(day), where=pd.Index(r))
     return samples
-    # if cluster_number is None:
-    #     return samples
-    # else:
-    #     #radius, centroid_long, centroid_lat = get_cluster_summary(store,cluster_number)
-    #     radius = 0.109577
-    #     centroid_long = 116.385246
-    #     centroid_lat = 39.921822
-    #     #print("radius: {}, centroid_long: {}, centroid_lat: {}".format(radius, centroid_long, centroid_lat))
-    #     #samples = samples[~samples.index.duplicated()]
-    #     samples = samples.query('sqrt( (longitude - @centroid_long)**2 + (latitude - @centroid_lat)**2) < @radius')
-    #     return samples
-    #     # samples = samples[(samples.longitude - centroid_long)**2 <= radius ]
-    #     # return samples
 
-
+"""
+Returns a value for K using the elbow method on a random sample of n_samples.
+"""
 def sample_elbow(store, n_samples=10000, day=None):
     sample_set = sample(store, n_samples, day)
     long_lats = sample_set.filter(items=['longitude', 'latitude'])

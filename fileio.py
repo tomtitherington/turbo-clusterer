@@ -102,61 +102,6 @@ def day_split(store):
 def cluster_sp(store, day, order, threshold=None):
     cluster.create_clusters(store, day, order, threshold)
 
-
-def distance(c1, c2):
-    x = c1[0] - c2[0]
-    y = c1[1] - c2[1]
-    x *= x
-    y *= y
-    return np.sqrt(x + y)
-
-
-def find_cluster(clusters, long, lat):
-    print(long, lat)
-    c_index = 0
-    c_distance = distance(
-        (clusters.iat[0, 7], clusters.iat[0, 8]), (long, lat))
-    index = 1
-    for _, row in clusters.iloc[1:].iterrows():
-        dist = distance((row['centroid_0'], row['centroid_1']), (long, lat))
-        if dist < c_distance:
-            c_index = index
-            c_distance = dist
-        index += 1
-    return clusters.iat[c_index, 0]
-
-
-def create_cluster_sequence(store, taxi, layer):
-    try:
-        clusters = store.get('clusters/l{}'.format(layer))
-        taxi_sp = store.get('sp/t{}'.format(taxi))
-    except:
-        print("Cluster sequence at layer {} could not be calculated".format(layer))
-        return
-    print(clusters)
-    cluster_seq = np.array([])
-    for _, row in taxi_sp.iterrows():
-        cluster = find_cluster(clusters, row['longitude'], row['latitude'])
-        #print('cluster id: {}'.format(cluster))
-        cluster_seq = np.append(cluster_seq, cluster)
-    taxi_sp['cluster'] = cluster_seq
-    print(cluster_seq)
-    store.append("sp/t{}".format(taxi), taxi_sp,  format='table',
-                 append=False, index=False)
-
-
-def create_cluster_sequences(store, r, layer):
-    for taxi in (r[0], r[1]):
-        create_cluster_sequence(store, taxi, layer)
-
-
-def read_clusterseq(store, taxi):
-    df = store.get('sp/t{}'.format(taxi))
-    for _, row in df.iterrows():
-        print(row)
-        print("\n")
-
-
 def get_sp(store, taxi):
     return store.get('sp/t{}'.format(taxi))
 
@@ -204,12 +149,9 @@ ap.add_argument('--auto_cluster', nargs=2, metavar=('DAY', 'ORDER'),
                 help='cluster the stop points for the day and order specified with automatic threshold')
 ap.add_argument('--cluster', nargs=3, metavar=('DAY', 'ORDER', 'THRESH'),
                 help='cluster the stop points for the day, order and threshold specified')
-ap.add_argument('--clusterseq', nargs=3, metavar=('LEFT_BOUND', 'RIGHT_BOUND', 'LAYER'),
-                help='find the sequence of visited clusters in a specified layer of the tree')
-ap.add_argument('--read_clusterseq', nargs=1, metavar=('TAXI_ID'))
 ap.add_argument('--read_log', nargs=1, metavar=('TAXI_ID'))
 ap.add_argument('--delete_run', nargs=2, metavar=('DAY', 'ORDER'),
-                help='delete the clusters produced run on a specific day and order value')
+                help='delete the clusters produced on a run on a specific day and order value')
 ap.add_argument('--delete', choices=['logs', 'sp', 'clusters'],
                 help='delete a group within the HDF5 store from the choices listed')
 args = ap.parse_args()
@@ -234,11 +176,6 @@ if args.auto_cluster:
 if args.cluster:
     cluster_sp(store, int(
         args.cluster[0]), int(args.cluster[1]), float(args.cluster[2]))  # stop point clustering
-if args.clusterseq:
-    create_cluster_sequences(store, (int(args.clusterseq[0]), int(
-        args.clusterseq[1])), int(args.clusterseq[2]))  # cluster sequences
-if args.read_clusterseq:
-    read_clusterseq(store, int(*args.read_clusterseq))
 if args.read_log:
     readstore_log(store, int(*args.read_log))
 

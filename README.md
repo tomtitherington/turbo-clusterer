@@ -66,4 +66,4 @@ To plot the clusters on the map, you can run the plot function. It simply reads 
 ./fileio.py --plot_clusters DAY ORDER 'taxi_store.h5'
 ```
 
-**NOTE** that if you run clustering twice (step 4) with the same day and order values, the existing clusters will be appended. This means you will have the clusters created in the original run plus the clusters in the second run. To ensure that this is not the case, the clusters must first be deleted.
+**NOTE** that if you run clustering twice (step 4) with the same day and order values, the existing clusters will be appended. This means you will have the clusters created in the original run plus the clusters in the second run. To ensure that this is not the case, the clusters must first be deleted. To delete all clusters you can you the `--delete` command, to delete the clusters produced on a certain run you can use `--delete_run`.

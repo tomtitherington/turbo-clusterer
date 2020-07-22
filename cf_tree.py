@@ -4,7 +4,7 @@ import functools as ft
 import numpy as np
 import pandas as pd
 
-# NOTE: Using a branching factor of 1 or 2 will produce poor results
+# NOTE: Using a branching factor of 1 or 2 will produce poor results.
 
 __CID__ = 0
 
